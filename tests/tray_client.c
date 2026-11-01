@@ -80,7 +80,7 @@ int main(void) {
             XSync(dpy, False);
             if (!XGetWindowAttributes(dpy, icon, &attr)) return 3;
             {
-                Window child, root;
+                Window child;
                 int x, y;
                 XTranslateCoordinates(dpy, icon, tray, 0, 0, &x, &y, &child);
                 printf("%d %d %d %d\n", x, y, attr.width, attr.height);

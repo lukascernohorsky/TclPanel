@@ -15,6 +15,31 @@ static Display *open_display(Tcl_Interp *ip) {
 static Atom atom(Display *dpy, const char *name) {
     return XInternAtom(dpy, name, False);
 }
+
+/*
+ * Xlib reports invalid resource IDs through its asynchronous error handler;
+ * XGetWindowAttributes() alone does not protect the process from BadWindow.
+ * The display is newly opened here, so synchronizing around this one request
+ * safely scopes the temporary handler to parent-window validation.
+ */
+static int trapped_x_error = 0;
+static int tray_validation_error_handler(Display *dpy, XErrorEvent *event) {
+    (void)dpy;
+    trapped_x_error = event->error_code;
+    return 0;
+}
+static int valid_tray_parent(Display *dpy, Window parent) {
+    XWindowAttributes attributes;
+    XErrorHandler previous_handler;
+    int status;
+    trapped_x_error = 0;
+    previous_handler = XSetErrorHandler(tray_validation_error_handler);
+    status = XGetWindowAttributes(dpy, parent, &attributes);
+    XSync(dpy, False);
+    XSetErrorHandler(previous_handler);
+    return status != 0 && trapped_x_error == 0 &&
+           attributes.class == InputOutput;
+}
 static int get_cardinal(Display *dpy, Window win, const char *name,
                         unsigned long *value) {
     Atom actual;
@@ -439,18 +464,17 @@ static int TrayStartCmd(ClientData cd, Tcl_Interp *ip, int objc,
     }
     {
         Display *new_display = XOpenDisplay(NULL);
-        XWindowAttributes parent_attributes;
         if (new_display == NULL) {
             Tcl_SetObjResult(ip, Tcl_NewStringObj("cannot open X display for system tray", -1));
             return TCL_ERROR;
         }
         /*
          * Validate the embedding window before taking down an existing tray.
-         * XCreateSimpleWindow would otherwise report BadWindow asynchronously.
+         * Xlib reports BadWindow asynchronously, so validation uses a
+         * temporary error handler and XSync rather than relying on the
+         * synchronous return value of XGetWindowAttributes().
          */
-        if (!XGetWindowAttributes(new_display, (Window)parent,
-                                  &parent_attributes) ||
-            parent_attributes.class != InputOutput) {
+        if (!valid_tray_parent(new_display, (Window)parent)) {
             XCloseDisplay(new_display);
             Tcl_SetObjResult(ip, Tcl_NewStringObj(
                 "tray parent must be an existing InputOutput X11 window", -1));
