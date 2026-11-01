@@ -9,7 +9,7 @@ proc ::tclpanel::module::tray::create {parent} {
     pack $parent.tray -side right -fill y
     set frame $parent.tray
     bind $frame <Configure> ::tclpanel::module::tray::configure
-    bind $frame <Destroy> ::tclpanel::module::tray::destroyed
+    bind $frame <Destroy> [list ::tclpanel::module::tray::destroyed %W]
     after idle ::tclpanel::module::tray::start
 }
 proc ::tclpanel::module::tray::start {} {
@@ -38,7 +38,13 @@ proc ::tclpanel::module::tray::configure {} {
     }
 }
 proc ::tclpanel::module::tray::changed {} {
-    # Native XEmbed clients render into the C-managed child window.
+    variable frame
+    if {![winfo exists $frame]} return
+    set slots [::x11::tray_count]
+    set height [winfo height $frame]
+    if {$height < 1} { set height [::tclpanel::config::get height 36] }
+    $frame configure -width [expr {max(8, $slots * $height)}]
+    catch {::x11::tray_configure [winfo width $frame] $height}
 }
 proc ::tclpanel::module::tray::destroyed {w} {
     variable started
