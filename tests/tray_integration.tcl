@@ -145,6 +145,30 @@ try {
     }
     wait_for {![::x11::tray_active]} "tray did not detect selection loss"
     wait_for {[::x11::tray_count] == 0} "tray did not clean up after selection loss"
+
+    # Destroying the embedding parent must tear down the tray without
+    # sending requests to child windows that the X server already destroyed.
+    set trayWindow [::x11::tray_start $parentId 48 24 tray_changed]
+    set trayStarted 1
+    puts $channel "dock $trayWindow"
+    flush $channel
+    if {[gets $channel iconId] < 0} { error "test client did not create icon before parent destruction" }
+    wait_for {[::x11::tray_count] == 1} "tray did not dock icon before parent destruction"
+    puts $channel destroyparent
+    flush $channel
+    if {[gets $channel response] < 0 || $response ne "ok"} {
+        error "test client failed to destroy tray parent"
+    }
+    wait_for {![::x11::tray_active]} "tray remained active after parent destruction"
+    wait_for {[::x11::tray_count] == 0} "tray retained icons after parent destruction"
+    set trayStarted 0
+
+    puts $channel newparent
+    flush $channel
+    if {[gets $channel parentId] < 0} { error "test client failed to create replacement parent" }
+    set trayWindow [::x11::tray_start $parentId 48 24 tray_changed]
+    set trayStarted 1
+    if {![::x11::tray_active]} { error "tray did not restart with replacement parent" }
     puts "XEmbed integration test passed"
 } finally {
     if {$trayStarted} { catch {::x11::tray_stop} }

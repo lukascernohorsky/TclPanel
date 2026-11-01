@@ -125,6 +125,18 @@ int main(void) {
             XFlush(dpy);
             puts("done"); fflush(stdout);
             icon2 = None;
+        } else if (strcmp(command, "destroyparent") == 0 && parent != None) {
+            XDestroyWindow(dpy, parent);
+            XFlush(dpy);
+            parent = None;
+            puts("ok"); fflush(stdout);
+        } else if (strcmp(command, "newparent") == 0) {
+            parent = XCreateSimpleWindow(dpy, DefaultRootWindow(dpy), 0, 0,
+                                         320, 48, 0, 0, 0);
+            XMapWindow(dpy, parent);
+            XSync(dpy, False);
+            printf("%lu\\n", (unsigned long)parent);
+            fflush(stdout);
         } else if (strcmp(command, "steal") == 0) {
             char selection_name[64];
             Atom selection;

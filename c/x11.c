@@ -373,6 +373,10 @@ static void tray_selection_lost_idle(ClientData cd) {
     (void)cd;
     tray_stop_internal();
 }
+static void tray_parent_lost_idle(ClientData cd) {
+    (void)cd;
+    tray_stop_internal();
+}
 static void tray_deleted(ClientData cd, Tcl_Interp *ip) {
     (void)cd;
     if (tray_interp == ip) tray_stop_internal();
@@ -421,6 +425,20 @@ static void tray_readable(ClientData cd, int mask) {
             else XUnmapWindow(tray_display, ev.xproperty.window);
             tray_layout();
         } else if (ev.type == DestroyNotify) {
+            if (ev.xdestroywindow.window == tray_parent ||
+                ev.xdestroywindow.window == tray_window) {
+                /*
+                 * The embedding hierarchy is gone. Its child tray window and
+                 * any docked icons have already been destroyed by the server;
+                 * do not issue cleanup requests against those stale XIDs.
+                 */
+                tray_icon_count = 0;
+                tray_window = None;
+                tray_parent = None;
+                tray_notify();
+                Tcl_DoWhenIdle(tray_parent_lost_idle, NULL);
+                return;
+            }
             tray_remove_icon(ev.xdestroywindow.window);
         } else if (ev.type == ConfigureRequest) {
             XWindowChanges changes;
@@ -487,6 +505,7 @@ static int TrayStartCmd(ClientData cd, Tcl_Interp *ip, int objc,
     tray_width = width; tray_height = height;
     tray_icon_size = 0; tray_icon_gap = 0;
     tray_screen = DefaultScreen(tray_display);
+    XSelectInput(tray_display, tray_parent, StructureNotifyMask);
     tray_window = XCreateSimpleWindow(tray_display, tray_parent, 0, 0,
                                       (unsigned int)width, (unsigned int)height,
                                       0, 0, 0);
