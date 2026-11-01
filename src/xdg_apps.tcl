@@ -92,9 +92,13 @@ proc ::tclpanel::xdg::parse_file {path} {
         if {!$in_entry || $line eq "" || [regexp {^[ \t]*[#;]} $line]} { continue }
         if {![regexp {^([^=]+)=(.*)$} $line -> key value]} { continue }
         set key [string trim $key]
-        if {[regexp {^(Name|GenericName|Comment)(\[([^]]+)\])?$} $key -> base locale]} {
-            if {$locale ne ""} { dict set values [format "%s@%s" $base $locale] [::tclpanel::xdg::decode_value $value] } else { dict set values $base [::tclpanel::xdg::decode_value $value] }
-        } else { dict set values $key [::tclpanel::xdg::decode_value $value] }
+        if {[regexp {^(Name|GenericName|Comment)\[([^]]+)\]$} $key -> base locale]} {
+            dict set values [format "%s@%s" $base $locale] [::tclpanel::xdg::decode_value $value]
+        } elseif {[regexp {^(Name|GenericName|Comment)$} $key -> base]} {
+            dict set values $base [::tclpanel::xdg::decode_value $value]
+        } else {
+            dict set values $key [::tclpanel::xdg::decode_value $value]
+        }
     }
     if {![dict exists $values Type] || [dict get $values Type] ne "Application"} { return {} }
     set values [::tclpanel::xdg::localize_values $values]
