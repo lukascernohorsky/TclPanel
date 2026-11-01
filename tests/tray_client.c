@@ -135,7 +135,7 @@ int main(void) {
                                          320, 48, 0, 0, 0);
             XMapWindow(dpy, parent);
             XSync(dpy, False);
-            printf("%lu\\n", (unsigned long)parent);
+            printf("%lu\n", (unsigned long)parent);
             fflush(stdout);
         } else if (strcmp(command, "steal") == 0) {
             char selection_name[64];
