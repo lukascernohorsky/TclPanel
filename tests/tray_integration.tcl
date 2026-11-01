@@ -35,6 +35,15 @@ fconfigure $channel -buffering line
 set trayStarted 0
 try {
     if {[gets $channel parentId] < 0} { error "test client did not create parent window" }
+    if {![catch {
+        ::x11::tray_start 2147483647 48 24 tray_changed
+    } invalidParentError]} {
+        error "tray accepted a nonexistent parent window"
+    }
+    if {![string match "*tray parent*" $invalidParentError]} {
+        error "unexpected invalid-parent error: $invalidParentError"
+    }
+
     set trayWindow [::x11::tray_start $parentId 48 24 tray_changed]
     set trayStarted 1
 

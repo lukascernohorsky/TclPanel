@@ -437,11 +437,27 @@ static int TrayStartCmd(ClientData cd, Tcl_Interp *ip, int objc,
         Tcl_SetObjResult(ip, Tcl_NewStringObj("invalid tray parent or geometry", -1));
         return TCL_ERROR;
     }
-    tray_stop_internal();
-    tray_display = XOpenDisplay(NULL);
-    if (tray_display == NULL) {
-        Tcl_SetObjResult(ip, Tcl_NewStringObj("cannot open X display for system tray", -1));
-        return TCL_ERROR;
+    {
+        Display *new_display = XOpenDisplay(NULL);
+        XWindowAttributes parent_attributes;
+        if (new_display == NULL) {
+            Tcl_SetObjResult(ip, Tcl_NewStringObj("cannot open X display for system tray", -1));
+            return TCL_ERROR;
+        }
+        /*
+         * Validate the embedding window before taking down an existing tray.
+         * XCreateSimpleWindow would otherwise report BadWindow asynchronously.
+         */
+        if (!XGetWindowAttributes(new_display, (Window)parent,
+                                  &parent_attributes) ||
+            parent_attributes.class != InputOutput) {
+            XCloseDisplay(new_display);
+            Tcl_SetObjResult(ip, Tcl_NewStringObj(
+                "tray parent must be an existing InputOutput X11 window", -1));
+            return TCL_ERROR;
+        }
+        tray_stop_internal();
+        tray_display = new_display;
     }
     tray_interp = ip; tray_parent = (Window)parent;
     tray_width = width; tray_height = height;
