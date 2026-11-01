@@ -275,6 +275,21 @@ static void tray_notify(void) {
         Tcl_BackgroundException(tray_interp, TCL_ERROR);
     Tcl_DecrRefCount(tray_callback);
 }
+static int tray_icon_is_mapped(Window win) {
+    Atom actual;
+    int format;
+    unsigned long nitems, after;
+    unsigned char *data = NULL;
+    int mapped = 1; /* Legacy clients without _XEMBED_INFO are mapped by default. */
+    if (XGetWindowProperty(tray_display, win, tray_xembed_info, 0, 2, False,
+                           tray_xembed_info, &actual, &format, &nitems,
+                           &after, &data) == Success && data != NULL &&
+        actual == tray_xembed_info && format == 32 && nitems >= 2) {
+        mapped = ((((unsigned long *)data)[1] & 1UL) != 0);
+    }
+    if (data != NULL) XFree(data);
+    return mapped;
+}
 static void tray_layout(void) {
     int i, size = tray_height;
     if (size < 1) size = 1;
@@ -344,9 +359,8 @@ static void tray_readable(ClientData cd, int mask) {
                     XWindowAttributes attr;
                     if (XGetWindowAttributes(tray_display, icon, &attr)) {
                         tray_icons[tray_icon_count++] = icon;
-                        XSelectInput(tray_display, icon, StructureNotifyMask);
+                        XSelectInput(tray_display, icon, StructureNotifyMask | PropertyChangeMask);
                         XReparentWindow(tray_display, icon, tray_window, 0, 0);
-                        XMapWindow(tray_display, icon);
                         {
                             XEvent embedded;
                             memset(&embedded, 0, sizeof(embedded));
@@ -359,11 +373,17 @@ static void tray_readable(ClientData cd, int mask) {
                             embedded.xclient.data.l[2] = tray_window;
                             XSendEvent(tray_display, icon, False, NoEventMask, &embedded);
                         }
+                        if (tray_icon_is_mapped(icon)) XMapWindow(tray_display, icon);
+                        else XUnmapWindow(tray_display, icon);
                         tray_layout();
                         tray_notify();
                     }
                 }
             }
+        } else if (ev.type == PropertyNotify && ev.xproperty.atom == tray_xembed_info) {
+            if (tray_icon_is_mapped(ev.xproperty.window)) XMapWindow(tray_display, ev.xproperty.window);
+            else XUnmapWindow(tray_display, ev.xproperty.window);
+            tray_layout();
         } else if (ev.type == DestroyNotify) {
             tray_remove_icon(ev.xdestroywindow.window);
         } else if (ev.type == ConfigureRequest) {
@@ -649,6 +669,6 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     Tcl_CreateObjCommand(ip, "::x11::desktops", DesktopsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::current_desktop", CurrentDesktopCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::set_desktop", SetDesktopCmd, NULL, NULL);
-    Tcl_PkgProvide(ip, "tclpanelx11", "0.6");
+    Tcl_PkgProvide(ip, "tclpanelx11", "0.7");
     return TCL_OK;
 }
