@@ -31,3 +31,8 @@ Install with \`make install PREFIX=/usr/local\`, then start with \`tclpanel\`. \
 The XDG implementation is a practical Desktop Entry subset, not the complete freedesktop menu specification. It does not merge \`.menu\` files, resolve all localized keys, handle MIME actions or launch targets, or provide terminal emulation for \`Terminal=true\` entries. File/URL launch targets are not yet supported.
 
 The Xlib layer targets a single X screen and EWMH-compatible window managers. Event-driven taskbar/workspace updates, struts for monitors not aligned to the corresponding root-screen edge, XEmbed system tray, and platform-specific system monitoring and power management are not implemented. No live-X-server or FreeBSD build result is claimed.
+
+
+### System tray
+
+The `tray` module implements the freedesktop System Tray selection and XEmbed docking path through the X11 extension. It claims `_NET_SYSTEM_TRAY_Sn`, announces the manager, accepts dock requests, reparents client windows into its native X11 container, and tracks icon destruction. A running window manager or desktop environment that already owns the system tray selection must be configured not to provide a competing tray. The initial implementation uses a horizontal layout and a fixed icon slot based on panel height.

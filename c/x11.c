@@ -4,6 +4,7 @@
 #include <X11/extensions/Xrandr.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 static Display *open_display(Tcl_Interp *ip) {
     Display *dpy = XOpenDisplay(NULL);
@@ -250,6 +251,245 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
 }
 
 
+
+/* Minimal freedesktop System Tray manager using XEmbed. */
+static Display *tray_display = NULL;
+static Tcl_Interp *tray_interp = NULL;
+static Window tray_window = None;
+static Window tray_parent = None;
+static Window tray_icons[128];
+static int tray_icon_count = 0;
+static int tray_width = 1, tray_height = 24;
+static int tray_screen = 0;
+static int tray_event_base = 0;
+static Tcl_Obj *tray_callback = NULL;
+static Atom tray_selection = None;
+static Atom tray_opcode = None;
+static Atom tray_xembed = None;
+static Atom tray_xembed_info = None;
+
+static void tray_notify(void) {
+    if (tray_callback == NULL || tray_interp == NULL) return;
+    Tcl_IncrRefCount(tray_callback);
+    if (Tcl_EvalObjEx(tray_interp, tray_callback, TCL_EVAL_GLOBAL) != TCL_OK)
+        Tcl_BackgroundException(tray_interp, TCL_ERROR);
+    Tcl_DecrRefCount(tray_callback);
+}
+static void tray_layout(void) {
+    int i, size = tray_height;
+    if (size < 1) size = 1;
+    for (i = 0; i < tray_icon_count; i++)
+        XMoveResizeWindow(tray_display, tray_icons[i], i * size, 0,
+                          (unsigned int)size, (unsigned int)size);
+    XResizeWindow(tray_display, tray_window,
+                  (unsigned int)(tray_icon_count * size > tray_width ?
+                                 tray_icon_count * size : tray_width),
+                  (unsigned int)tray_height);
+    XFlush(tray_display);
+}
+static void tray_remove_icon(Window win) {
+    int i;
+    for (i = 0; i < tray_icon_count; i++) {
+        if (tray_icons[i] == win) {
+            for (; i + 1 < tray_icon_count; i++) tray_icons[i] = tray_icons[i + 1];
+            tray_icon_count--;
+            tray_layout();
+            tray_notify();
+            return;
+        }
+    }
+}
+static void tray_stop_internal(void) {
+    int i;
+    if (tray_display != NULL) {
+        Tcl_DeleteFileHandler(ConnectionNumber(tray_display));
+        for (i = 0; i < tray_icon_count; i++) {
+            XUnmapWindow(tray_display, tray_icons[i]);
+            XReparentWindow(tray_display, tray_icons[i],
+                            DefaultRootWindow(tray_display), 0, 0);
+        }
+        if (tray_selection != None &&
+            XGetSelectionOwner(tray_display, tray_selection) == tray_window)
+            XSetSelectionOwner(tray_display, tray_selection, None, CurrentTime);
+        if (tray_window != None) XDestroyWindow(tray_display, tray_window);
+        XFlush(tray_display);
+        XCloseDisplay(tray_display);
+    }
+    tray_display = NULL; tray_interp = NULL; tray_window = None;
+    tray_parent = None; tray_icon_count = 0; tray_selection = None;
+    if (tray_callback != NULL) {
+        Tcl_DecrRefCount(tray_callback);
+        tray_callback = NULL;
+    }
+}
+static void tray_deleted(ClientData cd, Tcl_Interp *ip) {
+    (void)cd;
+    if (tray_interp == ip) tray_stop_internal();
+}
+static void tray_readable(ClientData cd, int mask) {
+    XEvent ev;
+    (void)cd; (void)mask;
+    if (tray_display == NULL) return;
+    while (XPending(tray_display)) {
+        XNextEvent(tray_display, &ev);
+        if (ev.type == ClientMessage &&
+            ev.xclient.message_type == tray_opcode &&
+            ev.xclient.data.l[1] == 0) {
+            Window icon = (Window)ev.xclient.data.l[2];
+            if (tray_icon_count < 128) {
+                int i, exists = 0;
+                for (i = 0; i < tray_icon_count; i++)
+                    if (tray_icons[i] == icon) exists = 1;
+                if (!exists) {
+                    XWindowAttributes attr;
+                    if (XGetWindowAttributes(tray_display, icon, &attr)) {
+                        tray_icons[tray_icon_count++] = icon;
+                        XSelectInput(tray_display, icon, StructureNotifyMask);
+                        XReparentWindow(tray_display, icon, tray_window, 0, 0);
+                        XMapWindow(tray_display, icon);
+                        {
+                            XEvent embedded;
+                            memset(&embedded, 0, sizeof(embedded));
+                            embedded.xclient.type = ClientMessage;
+                            embedded.xclient.window = icon;
+                            embedded.xclient.message_type = tray_xembed;
+                            embedded.xclient.format = 32;
+                            embedded.xclient.data.l[0] = CurrentTime;
+                            embedded.xclient.data.l[1] = 0; /* XEMBED_EMBEDDED_NOTIFY */
+                            embedded.xclient.data.l[2] = tray_window;
+                            XSendEvent(tray_display, icon, False, NoEventMask, &embedded);
+                        }
+                        tray_layout();
+                        tray_notify();
+                    }
+                }
+            }
+        } else if (ev.type == DestroyNotify) {
+            tray_remove_icon(ev.xdestroywindow.window);
+        } else if (ev.type == ConfigureRequest) {
+            XWindowChanges changes;
+            changes.x = ev.xconfigurerequest.x;
+            changes.y = ev.xconfigurerequest.y;
+            changes.width = ev.xconfigurerequest.width;
+            changes.height = ev.xconfigurerequest.height;
+            changes.border_width = ev.xconfigurerequest.border_width;
+            changes.sibling = ev.xconfigurerequest.above;
+            changes.stack_mode = ev.xconfigurerequest.detail;
+            XConfigureWindow(tray_display, ev.xconfigurerequest.window,
+                             ev.xconfigurerequest.value_mask, &changes);
+            tray_layout();
+        } else if (ev.type == SelectionClear) {
+            tray_notify();
+        }
+    }
+}
+static int TrayStartCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                        Tcl_Obj *const objv[]) {
+    Tcl_WideInt parent;
+    int width, height;
+    char selection_name[64];
+    XEvent manager;
+    Atom orientation, visual;
+    (void)cd;
+    if (objc != 5) {
+        Tcl_WrongNumArgs(ip, 1, objv, "parentWindowId width height callbackCommand");
+        return TCL_ERROR;
+    }
+    if (Tcl_GetWideIntFromObj(ip, objv[1], &parent) != TCL_OK ||
+        Tcl_GetIntFromObj(ip, objv[2], &width) != TCL_OK ||
+        Tcl_GetIntFromObj(ip, objv[3], &height) != TCL_OK)
+        return TCL_ERROR;
+    if (parent <= 0 || width < 1 || height < 1) {
+        Tcl_SetObjResult(ip, Tcl_NewStringObj("invalid tray parent or geometry", -1));
+        return TCL_ERROR;
+    }
+    tray_stop_internal();
+    tray_display = XOpenDisplay(NULL);
+    if (tray_display == NULL) {
+        Tcl_SetObjResult(ip, Tcl_NewStringObj("cannot open X display for system tray", -1));
+        return TCL_ERROR;
+    }
+    tray_interp = ip; tray_parent = (Window)parent;
+    tray_width = width; tray_height = height;
+    tray_screen = DefaultScreen(tray_display);
+    tray_window = XCreateSimpleWindow(tray_display, tray_parent, 0, 0,
+                                      (unsigned int)width, (unsigned int)height,
+                                      0, 0, 0);
+    XSelectInput(tray_display, tray_window,
+                 StructureNotifyMask | SubstructureNotifyMask |
+                 SubstructureRedirectMask);
+    snprintf(selection_name, sizeof(selection_name), "_NET_SYSTEM_TRAY_S%d", tray_screen);
+    tray_selection = atom(tray_display, selection_name);
+    tray_opcode = atom(tray_display, "_NET_SYSTEM_TRAY_OPCODE");
+    tray_xembed = atom(tray_display, "_XEMBED");
+    tray_xembed_info = atom(tray_display, "_XEMBED_INFO");
+    (void)tray_xembed_info;
+    XSetSelectionOwner(tray_display, tray_selection, tray_window, CurrentTime);
+    XSync(tray_display, False);
+    if (XGetSelectionOwner(tray_display, tray_selection) != tray_window) {
+        tray_stop_internal();
+        Tcl_SetObjResult(ip, Tcl_NewStringObj("another system tray manager owns the selection", -1));
+        return TCL_ERROR;
+    }
+    orientation = atom(tray_display, "_NET_SYSTEM_TRAY_ORIENTATION");
+    {
+        unsigned long horizontal = 0;
+        XChangeProperty(tray_display, tray_window, orientation, XA_CARDINAL,
+                        32, PropModeReplace, (unsigned char *)&horizontal, 1);
+    }
+    visual = atom(tray_display, "_NET_SYSTEM_TRAY_VISUAL");
+    {
+        unsigned long visual_id = XVisualIDFromVisual(DefaultVisual(tray_display, tray_screen));
+        XChangeProperty(tray_display, tray_window, visual, XA_VISUALID,
+                        32, PropModeReplace, (unsigned char *)&visual_id, 1);
+    }
+    memset(&manager, 0, sizeof(manager));
+    manager.xclient.type = ClientMessage;
+    manager.xclient.window = DefaultRootWindow(tray_display);
+    manager.xclient.message_type = atom(tray_display, "MANAGER");
+    manager.xclient.format = 32;
+    manager.xclient.data.l[0] = CurrentTime;
+    manager.xclient.data.l[1] = tray_selection;
+    manager.xclient.data.l[2] = tray_window;
+    XSendEvent(tray_display, DefaultRootWindow(tray_display), False,
+               StructureNotifyMask, &manager);
+    XMapWindow(tray_display, tray_window);
+    XFlush(tray_display);
+    tray_callback = objv[4]; Tcl_IncrRefCount(tray_callback);
+    Tcl_CreateFileHandler(ConnectionNumber(tray_display), TCL_READABLE,
+                          tray_readable, NULL);
+    Tcl_SetObjResult(ip, Tcl_NewWideIntObj((Tcl_WideInt)tray_window));
+    return TCL_OK;
+}
+static int TrayConfigureCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                            Tcl_Obj *const objv[]) {
+    int width, height;
+    (void)cd;
+    if (objc != 3) { Tcl_WrongNumArgs(ip, 1, objv, "width height"); return TCL_ERROR; }
+    if (Tcl_GetIntFromObj(ip, objv[1], &width) != TCL_OK ||
+        Tcl_GetIntFromObj(ip, objv[2], &height) != TCL_OK) return TCL_ERROR;
+    if (tray_display == NULL) return TCL_OK;
+    if (width < 1 || height < 1) return TCL_OK;
+    tray_width = width; tray_height = height;
+    tray_layout();
+    return TCL_OK;
+}
+static int TrayStopCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                       Tcl_Obj *const objv[]) {
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    if (tray_interp == ip) tray_stop_internal();
+    return TCL_OK;
+}
+static int TrayCountCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                        Tcl_Obj *const objv[]) {
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    Tcl_SetObjResult(ip, Tcl_NewIntObj(tray_icon_count));
+    return TCL_OK;
+}
+
+
 static Display *monitor_watch_display = NULL;
 static Tcl_Interp *monitor_watch_interp = NULL;
 static Tcl_Obj *monitor_watch_callback = NULL;
@@ -395,6 +635,11 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     if (Tcl_FindNamespace(ip, "::x11", NULL, TCL_GLOBAL_ONLY) == NULL)
         Tcl_CreateNamespace(ip, "::x11", NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::strut", StrutCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::tray_start", TrayStartCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::tray_configure", TrayConfigureCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::tray_stop", TrayStopCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::tray_count", TrayCountCmd, NULL, NULL);
+    Tcl_CallWhenDeleted(ip, tray_deleted, NULL);
     Tcl_CreateObjCommand(ip, "::x11::monitors", MonitorsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::watch_monitors", WatchMonitorsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::unwatch_monitors", UnwatchMonitorsCmd, NULL, NULL);

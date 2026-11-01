@@ -1,7 +1,7 @@
 namespace eval ::tclpanel::config {
     variable values [dict create \
         position bottom monitor 0 height 36 background #252a34 foreground #f2f2f2 \
-        modules {launcher taskbar workspace clock}]
+        modules {launcher taskbar workspace tray clock}]
     variable home [expr {[info exists ::env(HOME)] ? $::env(HOME) : [file normalize ~]}]
     variable path [file join $home .config tclpanel config.tcl]
 }

@@ -16,6 +16,7 @@ foreach module [glob -nocomplain [file join $root src modules *.tcl]] {
 }
 assert {[llength [info commands ::tclpanel::module::taskbar::refresh]] == 1} "taskbar module not loaded"
 assert {[llength [info commands ::tclpanel::module::workspace::step]] == 1} "workspace module not loaded"
+assert {[llength [info commands ::tclpanel::module::tray::create]] == 1} "tray module not loaded"
 set fakeMonitors [list \
     [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 1] \
     [dict create name DP-1 x 1920 y 0 width 2560 height 1440 primary 0]]
