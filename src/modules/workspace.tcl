@@ -12,7 +12,6 @@ proc ::tclpanel::module::workspace::create {parent} {
     pack $parent.workspace -side left -fill y
     ::tclpanel::module::workspace::refresh $parent.workspace
 }
-
 proc ::tclpanel::module::workspace::refresh {w} {
     if {![winfo exists $w]} { return }
     set current "?"
@@ -36,15 +35,12 @@ proc ::tclpanel::module::workspace::refresh {w} {
     }
     after 4000 [list ::tclpanel::module::workspace::refresh $w]
 }
-
 proc ::tclpanel::module::workspace::step {delta} {
     if {[llength [info commands ::x11::current_desktop]]} {
         if {[catch {set current [::x11::current_desktop]}] ||
             [catch {set count [::x11::desktops]}] || $count < 1} { return }
         set target [expr {$current + $delta}]
-        if {$target >= 0 && $target < $count} {
-            catch {::x11::set_desktop $target}
-        }
+        if {$target >= 0 && $target < $count} { catch {::x11::set_desktop $target} }
         return
     }
     if {[auto_execok wmctrl] ne "" && ![catch {exec wmctrl -d} data]} {
@@ -55,8 +51,6 @@ proc ::tclpanel::module::workspace::step {delta} {
             if {[regexp {^([0-9]+)\s+} $line]} { incr count }
         }
         set target [expr {$current + $delta}]
-        if {$current >= 0 && $target >= 0 && $target < $count} {
-            catch {exec wmctrl -s $target}
-        }
+        if {$current >= 0 && $target >= 0 && $target < $count} { catch {exec wmctrl -s $target} }
     }
 }
