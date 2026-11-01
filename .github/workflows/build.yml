@@ -10,8 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config tcl-dev tk-dev libx11-dev libxrandr-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config tcl-dev tk-dev libx11-dev libxrandr-dev xvfb
       - name: Build X11 extension
         run: make
       - name: Run Tcl smoke tests
         run: make test
+      - name: Run XEmbed integration test
+        run: make test-tray
