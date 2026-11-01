@@ -65,6 +65,28 @@ try {
         error "tray icon was not centered and resized: $geometry"
     }
 
+    puts $channel "dock2 $trayWindow"
+    flush $channel
+    if {[gets $channel icon2Id] < 0} { error "test client did not create second tray icon" }
+    wait_for {[::x11::tray_count] == 2} "tray did not accept second dock request"
+    puts $channel geometry2
+    flush $channel
+    if {[gets $channel geometry2] < 0 || $geometry2 ne "20 4 16 16"} {
+        error "second tray icon was not placed after the first: $geometry2"
+    }
+
+    ::x11::tray_configure 100 32 20 5
+    puts $channel geometry
+    flush $channel
+    if {[gets $channel geometry] < 0 || $geometry ne "0 6 20 20"} {
+        error "first tray icon did not adapt to resized tray: $geometry"
+    }
+    puts $channel geometry2
+    flush $channel
+    if {[gets $channel geometry2] < 0 || $geometry2 ne "25 6 20 20"} {
+        error "second tray icon did not adapt to resized tray: $geometry2"
+    }
+
     puts $channel unmap
     flush $channel
     if {[gets $channel response] < 0 || $response ne "ok"} {
@@ -82,9 +104,20 @@ try {
     puts $channel destroy
     flush $channel
     if {[gets $channel response] < 0 || $response ne "done"} {
-        error "test client failed to destroy icon"
+        error "test client failed to destroy first icon"
     }
-    wait_for {[::x11::tray_count] == 0} "tray did not remove destroyed icon"
+    wait_for {[::x11::tray_count] == 1} "tray did not remove destroyed first icon"
+    puts $channel geometry2
+    flush $channel
+    if {[gets $channel geometry2] < 0 || $geometry2 ne "0 6 20 20"} {
+        error "tray did not compact icon layout after removal: $geometry2"
+    }
+    puts $channel destroy2
+    flush $channel
+    if {[gets $channel response] < 0 || $response ne "done"} {
+        error "test client failed to destroy second icon"
+    }
+    wait_for {[::x11::tray_count] == 0} "tray did not remove final destroyed icon"
     if {$callbackCount < 2} { error "tray change callback was not invoked" }
 
     puts $channel steal

@@ -6,7 +6,7 @@
 
 int main(void) {
     Display *dpy = XOpenDisplay(NULL);
-    Window parent, icon = None, tray = None, takeover = None;
+    Window parent, icon = None, icon2 = None, tray = None, takeover = None;
     Atom opcode, xembed_info;
     unsigned long info[2] = {0, 1};
     XEvent ev;
@@ -47,6 +47,25 @@ int main(void) {
             XFlush(dpy);
             printf("%lu\n", (unsigned long)icon);
             fflush(stdout);
+        } else if (strncmp(command, "dock2 ", 6) == 0) {
+            tray = (Window)strtoul(command + 6, NULL, 0);
+            icon2 = XCreateSimpleWindow(dpy, parent, 0, 0, 24, 24, 0, 0, 0);
+            XSelectInput(dpy, icon2, StructureNotifyMask | PropertyChangeMask);
+            XChangeProperty(dpy, icon2, xembed_info, xembed_info, 32,
+                            PropModeReplace, (unsigned char *)info, 2);
+            XMapWindow(dpy, icon2);
+            memset(&ev, 0, sizeof(ev));
+            ev.xclient.type = ClientMessage;
+            ev.xclient.window = tray;
+            ev.xclient.message_type = opcode;
+            ev.xclient.format = 32;
+            ev.xclient.data.l[0] = CurrentTime;
+            ev.xclient.data.l[1] = 0;
+            ev.xclient.data.l[2] = (long)icon2;
+            XSendEvent(dpy, tray, False, NoEventMask, &ev);
+            XFlush(dpy);
+            printf("%lu\\n", (unsigned long)icon2);
+            fflush(stdout);
         } else if (strcmp(command, "embed") == 0 && icon != None) {
             Atom xembed = XInternAtom(dpy, "_XEMBED", False);
             int found = 0;
@@ -86,11 +105,26 @@ int main(void) {
                 printf("%d %d %d %d\n", x, y, attr.width, attr.height);
                 fflush(stdout);
             }
+        } else if (strcmp(command, "geometry2") == 0 && icon2 != None) {
+            XSync(dpy, False);
+            if (!XGetWindowAttributes(dpy, icon2, &attr)) return 3;
+            {
+                Window child;
+                int x, y;
+                XTranslateCoordinates(dpy, icon2, tray, 0, 0, &x, &y, &child);
+                printf("%d %d %d %d\\n", x, y, attr.width, attr.height);
+                fflush(stdout);
+            }
         } else if (strcmp(command, "destroy") == 0 && icon != None) {
             XDestroyWindow(dpy, icon);
             XFlush(dpy);
             puts("done"); fflush(stdout);
             icon = None;
+        } else if (strcmp(command, "destroy2") == 0 && icon2 != None) {
+            XDestroyWindow(dpy, icon2);
+            XFlush(dpy);
+            puts("done"); fflush(stdout);
+            icon2 = None;
         } else if (strcmp(command, "steal") == 0) {
             char selection_name[64];
             Atom selection;
@@ -107,6 +141,7 @@ int main(void) {
         }
     }
     if (icon != None) XDestroyWindow(dpy, icon);
+    if (icon2 != None) XDestroyWindow(dpy, icon2);
     if (takeover != None) {
         char selection_name[64];
         Atom selection;
