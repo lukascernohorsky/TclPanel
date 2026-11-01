@@ -120,6 +120,24 @@ try {
     wait_for {[::x11::tray_count] == 0} "tray did not remove final destroyed icon"
     if {$callbackCount < 2} { error "tray change callback was not invoked" }
 
+    # Explicit stop must release the selection and permit a fresh manager.
+    ::x11::tray_stop
+    set trayStarted 0
+    if {[::x11::tray_active]} { error "tray remained active after explicit stop" }
+    if {[::x11::tray_count] != 0} { error "tray retained icons after explicit stop" }
+
+    set trayWindow [::x11::tray_start $parentId 48 24 tray_changed]
+    set trayStarted 1
+    if {![::x11::tray_active]} { error "tray did not become active after restart" }
+    ::x11::tray_stop
+    set trayStarted 0
+    ::x11::tray_stop
+    if {[::x11::tray_active]} { error "tray became active after repeated stop" }
+
+    set trayWindow [::x11::tray_start $parentId 48 24 tray_changed]
+    set trayStarted 1
+    if {![::x11::tray_active]} { error "tray did not start after repeated stop" }
+
     puts $channel steal
     flush $channel
     if {[gets $channel response] < 0 || $response ne "ok"} {
