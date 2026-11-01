@@ -58,6 +58,7 @@ proc ::tclpanel::xdg::parse_file {path} {
     if {[dict get $values Hidden] eq "true" || [dict get $values NoDisplay] eq "true"} { return {} }
     if {![::tclpanel::xdg::visible_for_desktop $values]} { return {} }
     if {[dict get $values Name] eq "" || [dict get $values Exec] eq ""} { return {} }
+    if {[catch {::tclpanel::xdg::tokenize_exec [dict get $values Exec]}]} { return {} }
     set tryexec [dict get $values TryExec]
     if {$tryexec ne "" && [auto_execok $tryexec] eq "" && ![file executable $tryexec]} { return {} }
     dict set values DesktopFile [file normalize $path]
