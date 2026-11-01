@@ -78,5 +78,7 @@ proc ::tclpanel::panel::apply_strut {height} {
     if {($edge eq "top" && $y != 0) || ($edge eq "bottom" && ($y + $mh) != $root_height)} {
         return
     }
-    catch {::x11::strut [winfo id $bar] $edge $height}
+    set x [dict get $monitor x]
+    set width [dict get $monitor width]
+    catch {::x11::strut [winfo id $bar] $edge $height $x [expr {$x + $width - 1}]}
 }

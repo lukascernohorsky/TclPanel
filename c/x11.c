@@ -198,11 +198,11 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
     Atom partial, basic, type, dock, state, state_values[4];
     unsigned long values[12] = {0};
     const char *edge, *window_text;
-    int thickness, width;
+    int thickness, width, x_start = 0, x_end;
     char *end = NULL;
     unsigned long id;
     (void)cd;
-    if (objc != 4) { Tcl_WrongNumArgs(ip, 1, objv, "windowId top|bottom thickness"); return TCL_ERROR; }
+    if (objc != 4 && objc != 6) { Tcl_WrongNumArgs(ip, 1, objv, "windowId top|bottom thickness ?xStart xEnd?"); return TCL_ERROR; }
     window_text = Tcl_GetString(objv[1]);
     id = strtoul(window_text, &end, 0);
     if (end == window_text || end == NULL || *end != '\0') {
@@ -216,10 +216,23 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
     }
     dpy = open_display(ip); if (dpy == NULL) return TCL_ERROR;
     width = DisplayWidth(dpy, DefaultScreen(dpy)); win = (Window)id;
+    x_end = width - 1;
+    if (objc == 6) {
+        if (Tcl_GetIntFromObj(ip, objv[4], &x_start) != TCL_OK ||
+            Tcl_GetIntFromObj(ip, objv[5], &x_end) != TCL_OK) {
+            XCloseDisplay(dpy);
+            return TCL_ERROR;
+        }
+        if (x_start < 0 || x_end < x_start || x_end >= width) {
+            XCloseDisplay(dpy);
+            Tcl_SetObjResult(ip, Tcl_NewStringObj("strut x range is outside the X screen", -1));
+            return TCL_ERROR;
+        }
+    }
     if (strcmp(edge, "top") == 0) {
-        values[2] = (unsigned long)thickness; values[8] = 0; values[9] = (unsigned long)(width - 1);
+        values[2] = (unsigned long)thickness; values[8] = (unsigned long)x_start; values[9] = (unsigned long)x_end;
     } else {
-        values[3] = (unsigned long)thickness; values[10] = 0; values[11] = (unsigned long)(width - 1);
+        values[3] = (unsigned long)thickness; values[10] = (unsigned long)x_start; values[11] = (unsigned long)x_end;
     }
     partial = atom(dpy, "_NET_WM_STRUT_PARTIAL"); basic = atom(dpy, "_NET_WM_STRUT");
     XChangeProperty(dpy, win, partial, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)values, 12);

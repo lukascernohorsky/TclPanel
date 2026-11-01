@@ -4,7 +4,7 @@ TclPanel is a standalone X11 desktop panel implemented in Tcl/Tk. It is intended
 
 ## Build and run
 
-Requirements: Tcl/Tk 8.6+, X11 development headers and libraries, a C compiler, Make, and pkg-config.
+Requirements: Tcl/Tk 8.6+, X11 and XRandR development headers and libraries (`libx11-dev` and `libxrandr-dev` on Debian/Ubuntu), a C compiler, Make, and pkg-config.
 
 \`\`\`sh
 make
@@ -30,4 +30,4 @@ Install with \`make install PREFIX=/usr/local\`, then start with \`tclpanel\`. \
 
 The XDG implementation is a practical Desktop Entry subset, not the complete freedesktop menu specification. It does not merge \`.menu\` files, resolve all localized keys, handle MIME actions or launch targets, or provide terminal emulation for \`Terminal=true\` entries. File/URL launch targets are not yet supported.
 
-The Xlib layer targets a single X screen and EWMH-compatible window managers. Event-driven taskbar/workspace updates, monitor-specific struts for monitors not aligned to root-screen edges, XEmbed system tray, and platform-specific system monitoring and power management are not implemented. No live-X-server or FreeBSD build result is claimed.
+The Xlib layer targets a single X screen and EWMH-compatible window managers. Event-driven taskbar/workspace updates, struts for monitors not aligned to the corresponding root-screen edge, XEmbed system tray, and platform-specific system monitoring and power management are not implemented. No live-X-server or FreeBSD build result is claimed.
