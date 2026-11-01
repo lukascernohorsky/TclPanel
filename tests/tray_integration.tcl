@@ -138,6 +138,29 @@ try {
     wait_for {[::x11::tray_count] == 0} "tray did not remove final destroyed icon"
     if {$callbackCount < 2} { error "tray change callback was not invoked" }
 
+    # Exercise the fixed 128-icon limit and verify that request 129 is rejected.
+    set callbacksBeforeFill $callbackCount
+    puts $channel "fill 129"
+    flush $channel
+    if {[gets $channel bulkCount] < 0 || $bulkCount != 129} {
+        error "test client failed to create 129 capacity-test icons"
+    }
+    wait_for {[::x11::tray_count] == 128} "tray did not accept exactly 128 icons"
+    after 100
+    update
+    if {[::x11::tray_count] != 128} {
+        error "tray accepted more than its 128-icon capacity"
+    }
+    if {$callbackCount - $callbacksBeforeFill != 128} {
+        error "capacity test produced an unexpected number of tray callbacks"
+    }
+    puts $channel clearbulk
+    flush $channel
+    if {[gets $channel response] < 0 || $response ne "ok"} {
+        error "test client failed to destroy capacity-test icons"
+    }
+    wait_for {[::x11::tray_count] == 0} "tray did not remove all capacity-test icons"
+
     # Explicit stop must release the selection and permit a fresh manager.
     ::x11::tray_stop
     set trayStarted 0

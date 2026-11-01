@@ -7,6 +7,8 @@
 int main(void) {
     Display *dpy = XOpenDisplay(NULL);
     Window parent, icon = None, icon2 = None, tray = None, takeover = None;
+    Window bulk_icons[129];
+    int bulk_count = 0;
     Atom opcode, xembed_info;
     unsigned long info[2] = {0, 1};
     XEvent ev;
@@ -77,6 +79,46 @@ int main(void) {
             ev.xclient.data.l[2] = (long)icon;
             XSendEvent(dpy, tray, False, NoEventMask, &ev);
             XFlush(dpy);
+            puts("ok"); fflush(stdout);
+        } else if (strncmp(command, "fill ", 5) == 0) {
+            char *end = NULL;
+            long requested = strtol(command + 5, &end, 10);
+            int i;
+            if (end == command + 5 || *end != '\0' ||
+                requested < 1 || requested > 129 || tray == None ||
+                parent == None || bulk_count != 0) {
+                puts("error"); fflush(stdout);
+                continue;
+            }
+            for (i = 0; i < (int)requested; i++) {
+                bulk_icons[i] = XCreateSimpleWindow(dpy, parent, 0, 0,
+                                                     24, 24, 0, 0, 0);
+                XSelectInput(dpy, bulk_icons[i],
+                             StructureNotifyMask | PropertyChangeMask);
+                XChangeProperty(dpy, bulk_icons[i], xembed_info, xembed_info,
+                                32, PropModeReplace,
+                                (unsigned char *)info, 2);
+                XMapWindow(dpy, bulk_icons[i]);
+                memset(&ev, 0, sizeof(ev));
+                ev.xclient.type = ClientMessage;
+                ev.xclient.window = tray;
+                ev.xclient.message_type = opcode;
+                ev.xclient.format = 32;
+                ev.xclient.data.l[0] = CurrentTime;
+                ev.xclient.data.l[1] = 0;
+                ev.xclient.data.l[2] = (long)bulk_icons[i];
+                XSendEvent(dpy, tray, False, NoEventMask, &ev);
+            }
+            bulk_count = (int)requested;
+            XSync(dpy, False);
+            printf("%d\n", bulk_count);
+            fflush(stdout);
+        } else if (strcmp(command, "clearbulk") == 0) {
+            int i;
+            for (i = 0; i < bulk_count; i++)
+                XDestroyWindow(dpy, bulk_icons[i]);
+            XSync(dpy, False);
+            bulk_count = 0;
             puts("ok"); fflush(stdout);
         } else if (strcmp(command, "embed") == 0 && icon != None) {
             Atom xembed = XInternAtom(dpy, "_XEMBED", False);
@@ -166,6 +208,7 @@ int main(void) {
     }
     if (icon != None) XDestroyWindow(dpy, icon);
     if (icon2 != None) XDestroyWindow(dpy, icon2);
+    { int i; for (i = 0; i < bulk_count; i++) XDestroyWindow(dpy, bulk_icons[i]); }
     if (takeover != None) {
         char selection_name[64];
         Atom selection;
