@@ -293,6 +293,8 @@ static Atom tray_opcode = None;
 static Atom tray_xembed = None;
 static Atom tray_xembed_info = None;
 
+static void tray_stop_internal(void);
+
 static void tray_notify(void) {
     if (tray_callback == NULL || tray_interp == NULL) return;
     Tcl_IncrRefCount(tray_callback);
