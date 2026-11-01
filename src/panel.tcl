@@ -71,14 +71,20 @@ proc ::tclpanel::panel::apply_strut {height} {
     variable monitor
     if {![winfo exists $bar] || ![llength [info commands ::x11::strut]]} { return }
     set edge [::tclpanel::config::get position bottom]
+    if {$edge ni {top bottom}} { set edge bottom }
     set root_height [winfo screenheight $bar]
+    set root_width [winfo screenwidth $bar]
     set y [dict get $monitor y]
+    set x [dict get $monitor x]
     set mh [dict get $monitor height]
+    set width [dict get $monitor width]
     # EWMH struts only reserve regions attached to a root-screen edge.
-    if {($edge eq "top" && $y != 0) || ($edge eq "bottom" && ($y + $mh) != $root_height)} {
+    # Clear any previous reservation if the selected monitor is not aligned.
+    if {$x < 0 || $x + $width > $root_width ||
+        ($edge eq "top" && $y != 0) ||
+        ($edge eq "bottom" && ($y + $mh) != $root_height)} {
+        catch {::x11::strut [winfo id $bar] $edge 0 0 [expr {$root_width - 1}]}
         return
     }
-    set x [dict get $monitor x]
-    set width [dict get $monitor width]
     catch {::x11::strut [winfo id $bar] $edge $height $x [expr {$x + $width - 1}]}
 }
