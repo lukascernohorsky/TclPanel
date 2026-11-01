@@ -22,6 +22,8 @@ try {
 [Desktop Entry]
 Type=Application
 Name=Text Editor
+Name[cs]=Textový editor
+Name[cs_CZ]=Textový editor CZ
 Exec=/usr/bin/env "APP_TITLE=%c" editor %%f
 Icon=accessories-text-editor
 Categories=Utility;TextEditor;
