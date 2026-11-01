@@ -49,6 +49,21 @@ int main(void) {
             XFlush(dpy);
             printf("%lu\n", (unsigned long)icon);
             fflush(stdout);
+        } else if (strncmp(command, "dock-stale ", 11) == 0) {
+            Window stale, target = (Window)strtoul(command + 11, NULL, 0);
+            stale = XCreateSimpleWindow(dpy, parent, 0, 0, 24, 24, 0, 0, 0);
+            XDestroyWindow(dpy, stale);
+            memset(&ev, 0, sizeof(ev));
+            ev.xclient.type = ClientMessage;
+            ev.xclient.window = target;
+            ev.xclient.message_type = opcode;
+            ev.xclient.format = 32;
+            ev.xclient.data.l[0] = CurrentTime;
+            ev.xclient.data.l[1] = 0;
+            ev.xclient.data.l[2] = (long)stale;
+            XSendEvent(dpy, target, False, NoEventMask, &ev);
+            XFlush(dpy);
+            puts("ok"); fflush(stdout);
         } else if (strncmp(command, "dock2 ", 6) == 0) {
             tray = (Window)strtoul(command + 6, NULL, 0);
             icon2 = XCreateSimpleWindow(dpy, parent, 0, 0, 24, 24, 0, 0, 0);

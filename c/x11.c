@@ -317,6 +317,43 @@ static int tray_icon_is_mapped(Window win) {
     if (data != NULL) XFree(data);
     return mapped;
 }
+/*
+ * A dock request can outlive its icon: the client may destroy the window
+ * before this connection processes the ClientMessage. Keep every request
+ * against that untrusted XID inside one synchronized error-trap scope.
+ */
+static int tray_dock_icon(Window win) {
+    XWindowAttributes attributes;
+    XEvent embedded;
+    XErrorHandler previous_handler;
+    int status, mapped;
+    XSync(tray_display, False);
+    trapped_x_error = 0;
+    previous_handler = XSetErrorHandler(tray_validation_error_handler);
+    status = XGetWindowAttributes(tray_display, win, &attributes);
+    if (status && trapped_x_error == 0)
+        XSelectInput(tray_display, win,
+                     StructureNotifyMask | PropertyChangeMask);
+    if (status && trapped_x_error == 0)
+        XReparentWindow(tray_display, win, tray_window, 0, 0);
+    if (status && trapped_x_error == 0) {
+        memset(&embedded, 0, sizeof(embedded));
+        embedded.xclient.type = ClientMessage;
+        embedded.xclient.window = win;
+        embedded.xclient.message_type = tray_xembed;
+        embedded.xclient.format = 32;
+        embedded.xclient.data.l[0] = CurrentTime;
+        embedded.xclient.data.l[1] = 0; /* XEMBED_EMBEDDED_NOTIFY */
+        embedded.xclient.data.l[2] = tray_window;
+        XSendEvent(tray_display, win, False, NoEventMask, &embedded);
+        mapped = tray_icon_is_mapped(win);
+        if (mapped) XMapWindow(tray_display, win);
+        else XUnmapWindow(tray_display, win);
+    }
+    XSync(tray_display, False);
+    XSetErrorHandler(previous_handler);
+    return status && trapped_x_error == 0;
+}
 static void tray_parent_lost_idle(ClientData cd) {
     (void)cd;
     tray_stop_internal();
@@ -410,29 +447,10 @@ static void tray_readable(ClientData cd, int mask) {
                 int i, exists = 0;
                 for (i = 0; i < tray_icon_count; i++)
                     if (tray_icons[i] == icon) exists = 1;
-                if (!exists) {
-                    XWindowAttributes attr;
-                    if (XGetWindowAttributes(tray_display, icon, &attr)) {
-                        tray_icons[tray_icon_count++] = icon;
-                        XSelectInput(tray_display, icon, StructureNotifyMask | PropertyChangeMask);
-                        XReparentWindow(tray_display, icon, tray_window, 0, 0);
-                        {
-                            XEvent embedded;
-                            memset(&embedded, 0, sizeof(embedded));
-                            embedded.xclient.type = ClientMessage;
-                            embedded.xclient.window = icon;
-                            embedded.xclient.message_type = tray_xembed;
-                            embedded.xclient.format = 32;
-                            embedded.xclient.data.l[0] = CurrentTime;
-                            embedded.xclient.data.l[1] = 0; /* XEMBED_EMBEDDED_NOTIFY */
-                            embedded.xclient.data.l[2] = tray_window;
-                            XSendEvent(tray_display, icon, False, NoEventMask, &embedded);
-                        }
-                        if (tray_icon_is_mapped(icon)) XMapWindow(tray_display, icon);
-                        else XUnmapWindow(tray_display, icon);
-                        tray_layout();
-                        tray_notify();
-                    }
+                if (!exists && tray_dock_icon(icon)) {
+                    tray_icons[tray_icon_count++] = icon;
+                    tray_layout();
+                    tray_notify();
                 }
             }
         } else if (ev.type == PropertyNotify && ev.xproperty.atom == tray_xembed_info) {

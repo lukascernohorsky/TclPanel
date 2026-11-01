@@ -69,6 +69,22 @@ try {
         error "duplicate dock request triggered an unnecessary change callback"
     }
 
+    # A stale XID must be ignored safely instead of reaching Xlib's default
+    # asynchronous error handler and terminating the panel process.
+    puts $channel "dock-stale $trayWindow"
+    flush $channel
+    if {[gets $channel response] < 0 || $response ne "ok"} {
+        error "test client failed to send stale-window dock request"
+    }
+    after 50
+    update
+    if {[::x11::tray_count] != 1} {
+        error "tray changed its icon count after a stale-window dock request"
+    }
+    if {$callbackCount != $callbacksBeforeRedock} {
+        error "stale-window dock request triggered a change callback"
+    }
+
     puts $channel embed
     flush $channel
     if {[gets $channel embedded] < 0 || $embedded != 1} {
