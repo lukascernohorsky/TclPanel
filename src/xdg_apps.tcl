@@ -46,24 +46,23 @@ proc ::tclpanel::xdg::locale_candidates {} {
             regsub {\..*$} $locale "" locale
             set modifier ""
             if {[regexp {^([^@]+)@(.+)$} $locale -> locale modifier]} {}
+            set language $locale
             if {[regexp {^([a-zA-Z]+)[_-]([a-zA-Z]+)$} $locale -> language territory]} {
-                if {$modifier ne ""} { lappend candidates "\${language}_\${territory}@\${modifier}" }
-                lappend candidates "\${language}_\${territory}"
-            } else {
-                set language $locale
+                if {$modifier ne ""} { lappend candidates [format "%s_%s@%s" $language $territory $modifier] }
+                lappend candidates [format "%s_%s" $language $territory]
             }
-            if {$modifier ne ""} { lappend candidates "\${language}@\${modifier}" }
+            if {$modifier ne ""} { lappend candidates [format "%s@%s" $language $modifier] }
             lappend candidates $language
         }
     }
-    return [lsort -unique -index 0 $candidates]
+    return [lsort -unique $candidates]
 }
 
 proc ::tclpanel::xdg::localize_values {values} {
     foreach base {Name GenericName Comment} {
         if {![dict exists $values $base]} { continue }
         foreach locale [::tclpanel::xdg::locale_candidates] {
-            set key "\${base}@\${locale}"
+            set key [format "%s@%s" $base $locale]
             if {[dict exists $values $key] && [dict get $values $key] ne ""} {
                 dict set values $base [dict get $values $key]
                 break
