@@ -261,7 +261,6 @@ static Window tray_icons[128];
 static int tray_icon_count = 0;
 static int tray_width = 1, tray_height = 24;
 static int tray_screen = 0;
-static int tray_event_base = 0;
 static Tcl_Obj *tray_callback = NULL;
 static Atom tray_selection = None;
 static Atom tray_opcode = None;
