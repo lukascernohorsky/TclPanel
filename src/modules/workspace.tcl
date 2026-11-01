@@ -30,16 +30,33 @@ proc ::tclpanel::module::workspace::refresh {w} {
     if {$count > 0 && $current ne "?"} {
         $w.prev configure -state [expr {$current <= 0 ? "disabled" : "normal"}]
         $w.next configure -state [expr {$current >= $count - 1 ? "disabled" : "normal"}]
+    } else {
+        $w.prev configure -state disabled
+        $w.next configure -state disabled
     }
     after 4000 [list ::tclpanel::module::workspace::refresh $w]
 }
 
 proc ::tclpanel::module::workspace::step {delta} {
-    if {![llength [info commands ::x11::current_desktop]]} { return }
-    if {[catch {set current [::x11::current_desktop]}] ||
-        [catch {set count [::x11::desktops]}] || $count < 1} { return }
-    set target [expr {$current + $delta}]
-    if {$target >= 0 && $target < $count} {
-        catch {::x11::set_desktop $target}
+    if {[llength [info commands ::x11::current_desktop]]} {
+        if {[catch {set current [::x11::current_desktop]}] ||
+            [catch {set count [::x11::desktops]}] || $count < 1} { return }
+        set target [expr {$current + $delta}]
+        if {$target >= 0 && $target < $count} {
+            catch {::x11::set_desktop $target}
+        }
+        return
+    }
+    if {[auto_execok wmctrl] ne "" && ![catch {exec wmctrl -d} data]} {
+        set current -1
+        set count 0
+        foreach line [split $data \n] {
+            if {[regexp {^([0-9]+)\s+\*} $line -> n]} { set current $n }
+            if {[regexp {^([0-9]+)\s+} $line]} { incr count }
+        }
+        set target [expr {$current + $delta}]
+        if {$current >= 0 && $target >= 0 && $target < $count} {
+            catch {exec wmctrl -s $target}
+        }
     }
 }
