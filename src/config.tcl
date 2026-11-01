@@ -1,6 +1,6 @@
 namespace eval ::tclpanel::config {
     variable values [dict create \
-        position bottom monitor 0 height 36 background #252a34 foreground #f2f2f2 \\
+        position bottom monitor 0 height 36 background #252a34 foreground #f2f2f2 \
         tray_icon_size 0 tray_icon_gap 2 \
         modules {launcher taskbar workspace tray clock}]
     variable home [expr {[info exists ::env(HOME)] ? $::env(HOME) : [file normalize ~]}]
