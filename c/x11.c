@@ -10,11 +10,10 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
     Window win;
     Atom partial, basic;
     unsigned long values[12] = {0};
-    const char *edge;
-    int thickness;
+    const char *edge, *window_text;
+    int thickness, width;
     char *end = NULL;
     unsigned long id;
-    int screen, width, height;
 
     (void)cd;
     if (objc != 4) {
@@ -22,8 +21,9 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
         return TCL_ERROR;
     }
 
-    id = strtoul(Tcl_GetString(objv[1]), &end, 0);
-    if (end == Tcl_GetString(objv[1]) || !end || *end != '\\0') {
+    window_text = Tcl_GetString(objv[1]);
+    id = strtoul(window_text, &end, 0);
+    if (end == window_text || end == NULL || *end != '\0') {
         Tcl_SetObjResult(ip, Tcl_NewStringObj("invalid X11 window id", -1));
         return TCL_ERROR;
     }
@@ -43,11 +43,8 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
         return TCL_ERROR;
     }
 
-    screen = DefaultScreen(dpy);
-    width = DisplayWidth(dpy, screen);
-    height = DisplayHeight(dpy, screen);
+    width = DisplayWidth(dpy, DefaultScreen(dpy));
     win = (Window)id;
-
     if (strcmp(edge, "top") == 0) {
         values[2] = (unsigned long)thickness;
         values[8] = 0;
@@ -66,7 +63,6 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
                     (unsigned char *)values, 4);
     XFlush(dpy);
     XCloseDisplay(dpy);
-    (void)height;
     return TCL_OK;
 }
 
