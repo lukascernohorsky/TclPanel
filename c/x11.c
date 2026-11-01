@@ -236,6 +236,91 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
     return TCL_OK;
 }
 
+
+static Display *monitor_watch_display = NULL;
+static Tcl_Interp *monitor_watch_interp = NULL;
+static Tcl_Obj *monitor_watch_callback = NULL;
+static int monitor_watch_event_base = 0;
+
+static void stop_monitor_watch(void) {
+    if (monitor_watch_display != NULL) {
+        Tcl_DeleteFileHandler(ConnectionNumber(monitor_watch_display));
+        XCloseDisplay(monitor_watch_display);
+        monitor_watch_display = NULL;
+    }
+    if (monitor_watch_callback != NULL) {
+        Tcl_DecrRefCount(monitor_watch_callback);
+        monitor_watch_callback = NULL;
+    }
+    monitor_watch_interp = NULL;
+}
+static void monitor_watch_deleted(ClientData cd, Tcl_Interp *ip) {
+    (void)cd;
+    if (monitor_watch_interp == ip) stop_monitor_watch();
+}
+static void monitor_watch_readable(ClientData cd, int mask) {
+    XEvent ev;
+    int changed = 0;
+    Tcl_Interp *ip = (Tcl_Interp *)cd;
+    (void)mask;
+    if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
+    while (XPending(monitor_watch_display)) {
+        XNextEvent(monitor_watch_display, &ev);
+        if (ev.type == monitor_watch_event_base + RRScreenChangeNotify) {
+            XRRUpdateConfiguration(&ev);
+            changed = 1;
+        } else if (ev.type == monitor_watch_event_base + RRNotify) {
+            changed = 1;
+        }
+    }
+    if (changed && monitor_watch_callback != NULL) {
+        Tcl_IncrRefCount(monitor_watch_callback);
+        if (Tcl_EvalObjEx(ip, monitor_watch_callback, TCL_EVAL_GLOBAL) != TCL_OK)
+            Tcl_BackgroundException(ip, TCL_ERROR);
+        Tcl_DecrRefCount(monitor_watch_callback);
+    }
+}
+static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                            Tcl_Obj *const objv[]) {
+    int error_base;
+    (void)cd;
+    if (objc != 2) {
+        Tcl_WrongNumArgs(ip, 1, objv, "callbackCommand");
+        return TCL_ERROR;
+    }
+    stop_monitor_watch();
+    monitor_watch_display = XOpenDisplay(NULL);
+    if (monitor_watch_display == NULL) {
+        Tcl_SetObjResult(ip, Tcl_NewStringObj("cannot open X display for monitor events", -1));
+        return TCL_ERROR;
+    }
+    if (!XRRQueryExtension(monitor_watch_display, &monitor_watch_event_base,
+                           &error_base)) {
+        XCloseDisplay(monitor_watch_display);
+        monitor_watch_display = NULL;
+        Tcl_SetObjResult(ip, Tcl_NewStringObj("XRandR extension unavailable", -1));
+        return TCL_ERROR;
+    }
+    XRRSelectInput(monitor_watch_display, DefaultRootWindow(monitor_watch_display),
+                   RRScreenChangeNotifyMask | RRCrtcChangeNotifyMask |
+                   RROutputChangeNotifyMask | RROutputPropertyNotifyMask);
+    XFlush(monitor_watch_display);
+    monitor_watch_interp = ip;
+    monitor_watch_callback = objv[1];
+    Tcl_IncrRefCount(monitor_watch_callback);
+    Tcl_CreateFileHandler(ConnectionNumber(monitor_watch_display), TCL_READABLE,
+                          monitor_watch_readable, ip);
+    Tcl_SetObjResult(ip, Tcl_NewBooleanObj(1));
+    return TCL_OK;
+}
+static int UnwatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                              Tcl_Obj *const objv[]) {
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    if (monitor_watch_interp == ip) stop_monitor_watch();
+    return TCL_OK;
+}
+
 static int MonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
                        Tcl_Obj *const objv[]) {
     Display *dpy;
@@ -298,11 +383,14 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
         Tcl_CreateNamespace(ip, "::x11", NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::strut", StrutCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::monitors", MonitorsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::watch_monitors", WatchMonitorsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::unwatch_monitors", UnwatchMonitorsCmd, NULL, NULL);
+    Tcl_CallWhenDeleted(ip, monitor_watch_deleted, NULL);
     Tcl_CreateObjCommand(ip, "::x11::windows", WindowsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::activate", ActivateCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::desktops", DesktopsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::current_desktop", CurrentDesktopCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::set_desktop", SetDesktopCmd, NULL, NULL);
-    Tcl_PkgProvide(ip, "tclpanelx11", "0.5");
+    Tcl_PkgProvide(ip, "tclpanelx11", "0.6");
     return TCL_OK;
 }
