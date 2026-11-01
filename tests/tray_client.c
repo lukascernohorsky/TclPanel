@@ -83,7 +83,7 @@ int main(void) {
                 Window child, root;
                 int x, y;
                 XTranslateCoordinates(dpy, icon, tray, 0, 0, &x, &y, &child);
-                printf("%d %d %d %d\\n", x, y, attr.width, attr.height);
+                printf("%d %d %d %d\n", x, y, attr.width, attr.height);
                 fflush(stdout);
             }
         } else if (strcmp(command, "destroy") == 0 && icon != None) {

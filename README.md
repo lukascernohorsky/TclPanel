@@ -30,7 +30,7 @@ Install with \`make install PREFIX=/usr/local\`, then start with \`tclpanel\`. \
 
 The XDG implementation is a practical Desktop Entry subset, not the complete freedesktop menu specification. It does not merge \`.menu\` files, resolve all localized keys, handle MIME actions or launch targets, or provide terminal emulation for \`Terminal=true\` entries. File/URL launch targets are not yet supported.
 
-The Xlib layer targets a single X screen and EWMH-compatible window managers. Event-driven taskbar/workspace updates, struts for monitors not aligned to the corresponding root-screen edge, XEmbed system tray, and platform-specific system monitoring and power management are not implemented. No live-X-server or FreeBSD build result is claimed.
+The Xlib layer targets a single X screen and EWMH-compatible window managers. Event-driven taskbar/workspace updates, complete XDG menu-specification support, and platform-specific system monitoring and power management remain future work. The system tray currently implements horizontal XEmbed layout; vertical panel integration and full XEmbed focus navigation are not yet implemented. CI exercises the tray protocol under Xvfb; no live desktop-session compatibility or FreeBSD build result is claimed.
 
 
 ### System tray
