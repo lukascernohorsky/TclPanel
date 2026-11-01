@@ -100,6 +100,15 @@ NotShowIn=GNOME;
     assert_equal [::tclpanel::xdg::parse_file [file join $apps onlyshow.desktop]] "" "OnlyShowIn filtering"
     assert_equal [::tclpanel::xdg::parse_file [file join $apps notshow.desktop]] "" "NotShowIn filtering"
     unset ::env(XDG_CURRENT_DESKTOP)
+    set icon_dir [file join $tmp share icons hicolor 48x48 apps]
+    file mkdir $icon_dir
+    write_file [file join $icon_dir fixture-icon.png] {not-an-image}
+    set old_data_home ""
+    if {[info exists ::env(XDG_DATA_HOME)]} { set old_data_home $::env(XDG_DATA_HOME) }
+    set ::env(XDG_DATA_HOME) [file join $tmp share]
+    assert_equal [::tclpanel::xdg::icon_path fixture-icon 24] [file join $icon_dir fixture-icon.png] "icon theme lookup"
+    assert_equal [::tclpanel::xdg::icon_path missing-fixture-icon 24] "" "missing icon lookup"
+    if {$old_data_home eq ""} { unset -nocomplain ::env(XDG_DATA_HOME) } else { set ::env(XDG_DATA_HOME) $old_data_home }
     set q [::tclpanel::xdg::parse_file [file join $apps quoted.desktop]]
     assert_equal [::tclpanel::xdg::tokenize_exec [dict get $q Exec]] {/usr/bin/printf {hello world} %%c} "Exec tokenization"
     assert_true {[catch {::tclpanel::xdg::tokenize_exec [dict get [::tclpanel::xdg::parse_file [file join $apps badquote.desktop]] Exec]}]} "Malformed Exec must fail"

@@ -1,10 +1,11 @@
-namespace eval ::tclpanel::module::launcher {}
-
+namespace eval ::tclpanel::module::launcher {
+    variable menu_serial 0
+    variable icon_cache {}
+}
 proc ::tclpanel::module::launcher::create {parent} {
     button $parent.launcher -text "Applications" -command ::tclpanel::module::launcher::menu -padx 10
     pack $parent.launcher -side left -fill y
 }
-
 proc ::tclpanel::module::launcher::category_name {category} {
     set names [dict create AudioVideo "Audio & Video" Development Development Education Education \
         Game Games Graphics Graphics Network Internet Office Office Science Science \
@@ -12,7 +13,6 @@ proc ::tclpanel::module::launcher::category_name {category} {
     if {[dict exists $names $category]} { return [dict get $names $category] }
     return Other
 }
-
 proc ::tclpanel::module::launcher::menu {} {
     set m .tclpanel_apps
     catch {destroy $m}
@@ -47,14 +47,26 @@ proc ::tclpanel::module::launcher::menu {} {
                 dict set menus $category $sub
             }
             set sub [dict get $menus $category]
-            $sub add command -label [dict get $entry Name] \
-                -command [list ::tclpanel::module::launcher::run_entry $entry]
+            set opts [list -label [dict get $entry Name] -command [list ::tclpanel::module::launcher::run_entry $entry]]
+            if {[llength [info commands ::tclpanel::xdg::icon_path]]} {
+                set path [::tclpanel::xdg::icon_path [dict get $entry Icon] 24]
+                if {$path ne ""} {
+                    set key $path
+                    variable icon_cache
+                    if {![dict exists $icon_cache $key]} {
+                        set image_name ::tclpanel::module::launcher::icon[incr ::tclpanel::module::launcher::menu_serial]
+                        if {![catch {image create photo $image_name -file $path}]} {
+                            dict set icon_cache $key $image_name
+                        }
+                    }
+                    if {[dict exists $icon_cache $key]} { lappend opts -image [dict get $icon_cache $key] -compound left }
+                }
+            }
+            $sub add command {*}$opts
         }
     }
     tk_popup $m [winfo pointerx .] [winfo pointery .]
 }
-namespace eval ::tclpanel::module::launcher { variable menu_serial 0 }
-
 proc ::tclpanel::module::launcher::run_entry {entry} {
     if {[catch {::tclpanel::xdg::launch $entry} message]} {
         if {[llength [info commands tk_messageBox]]} {

@@ -129,3 +129,32 @@ proc ::tclpanel::xdg::launch {entry} {
     if {[dict get $entry Terminal]} { error "Terminal=true applications require a configured terminal launcher" }
     exec {*}[::tclpanel::xdg::exec_argv $entry] &
 }
+
+proc ::tclpanel::xdg::icon_path {icon {size 24}} {
+    if {$icon eq ""} { return "" }
+    if {[file pathtype $icon] eq "absolute" && [file isfile $icon]} { return $icon }
+    set sizes [lsort -unique -decreasing -integer [list $size 48 32 24 16]]
+    foreach base [::tclpanel::xdg::data_dirs] {
+        foreach theme {Adwaita hicolor} {
+            foreach candidate_size $sizes {
+                foreach category {apps categories status devices places mimetypes} {
+                    foreach ext {png gif ppm} {
+                        set path [file join $base icons $theme \${candidate_size}x\${candidate_size} $category \${icon}.\${ext}]
+                        if {[file isfile $path]} { return $path }
+                    }
+                }
+            }
+            foreach category {apps categories status devices places mimetypes} {
+                foreach ext {png gif ppm} {
+                    set path [file join $base icons $theme scalable $category \${icon}.\${ext}]
+                    if {[file isfile $path]} { return $path }
+                }
+            }
+        }
+        foreach ext {png gif ppm} {
+            set path [file join $base pixmaps \${icon}.\${ext}]
+            if {[file isfile $path]} { return $path }
+        }
+    }
+    return ""
+}

@@ -19,7 +19,7 @@ Install with \`make install PREFIX=/usr/local\`, then start with \`tclpanel\`. \
 - Tcl/Tk panel shell, user Tcl configuration and loadable module structure.
 - Xlib extension with EWMH client-window enumeration, activation, desktop count/current desktop/switching, and dock/strut properties.
 - Taskbar and workspace switcher use the Xlib extension when loaded; taskbar/workspace retain limited \`wmctrl\` fallback.
-- XDG application discovery from standard data directories, parsing of Application desktop entries, visibility filtering, and shell-free Exec argument expansion.
+- XDG application discovery from standard data directories, parsing of Application desktop entries, visibility filtering, shell-free Exec argument expansion, themed icon lookup, and category-grouped launcher menus.
 - Tcl tests for configuration, module loading, XDG discovery, entry filtering, quoting, and Exec field-code handling.
 
 ## Testing
