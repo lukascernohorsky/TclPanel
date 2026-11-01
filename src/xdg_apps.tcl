@@ -36,6 +36,43 @@ proc ::tclpanel::xdg::visible_for_desktop {entry} {
     return 1
 }
 
+proc ::tclpanel::xdg::locale_candidates {} {
+    set candidates {}
+    foreach variable {LANGUAGE LC_ALL LC_MESSAGES LANG} {
+        if {![info exists ::env($variable)] || $::env($variable) eq ""} { continue }
+        foreach raw [split $::env($variable) :] {
+            if {$raw eq "" || $raw eq "C" || $raw eq "POSIX"} { continue }
+            set locale $raw
+            regsub {\..*$} $locale "" locale
+            set modifier ""
+            if {[regexp {^([^@]+)@(.+)$} $locale -> locale modifier]} {}
+            if {[regexp {^([a-zA-Z]+)[_-]([a-zA-Z]+)$} $locale -> language territory]} {
+                if {$modifier ne ""} { lappend candidates "\${language}_\${territory}@\${modifier}" }
+                lappend candidates "\${language}_\${territory}"
+            } else {
+                set language $locale
+            }
+            if {$modifier ne ""} { lappend candidates "\${language}@\${modifier}" }
+            lappend candidates $language
+        }
+    }
+    return [lsort -unique -index 0 $candidates]
+}
+
+proc ::tclpanel::xdg::localize_values {values} {
+    foreach base {Name GenericName Comment} {
+        if {![dict exists $values $base]} { continue }
+        foreach locale [::tclpanel::xdg::locale_candidates] {
+            set key "\${base}@\${locale}"
+            if {[dict exists $values $key] && [dict get $values $key] ne ""} {
+                dict set values $base [dict get $values $key]
+                break
+            }
+        }
+    }
+    return $values
+}
+
 proc ::tclpanel::xdg::parse_file {path} {
     if {![file isfile $path] || ![file readable $path]} { return {} }
     set ch [open $path r]
@@ -53,6 +90,7 @@ proc ::tclpanel::xdg::parse_file {path} {
         } else { dict set values $key [::tclpanel::xdg::decode_value $value] }
     }
     if {![dict exists $values Type] || [dict get $values Type] ne "Application"} { return {} }
+    set values [::tclpanel::xdg::localize_values $values]
     foreach key {Name Exec Icon Categories TryExec Terminal Hidden NoDisplay OnlyShowIn NotShowIn} {
         if {![dict exists $values $key]} { dict set values $key "" }
     }

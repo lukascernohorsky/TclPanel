@@ -67,6 +67,13 @@ Exec=printf "unterminated
 }
     set parsed [::tclpanel::xdg::parse_file [file join $apps editor.desktop]]
     assert_equal [dict get $parsed Name] "Text Editor" "Name parsing"
+    set old_lang ""
+    if {[info exists ::env(LANG)]} { set old_lang $::env(LANG) }
+    set ::env(LANG) cs_CZ.UTF-8
+    set localized [::tclpanel::xdg::parse_file [file join $apps editor.desktop]]
+    assert_equal [dict get $localized Name] "Textový editor CZ" "localized desktop name"
+    if {$old_lang eq ""} { unset -nocomplain ::env(LANG) } else { set ::env(LANG) $old_lang }
+
     assert_equal [dict get $parsed Icon] "accessories-text-editor" "Icon parsing"
     assert_equal [dict get $parsed Categories] {Utility TextEditor} "Category parsing"
     assert_equal [dict get $parsed Terminal] 0 "Terminal default"
