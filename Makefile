@@ -1,0 +1,33 @@
+PREFIX ?= /usr/local
+TCLSH ?= tclsh
+PKG_CONFIG ?= pkg-config
+CC ?= cc
+CFLAGS ?= -O2 -Wall -Wextra
+BUILD_DIR = build
+EXT = $(BUILD_DIR)/libtclpanelx11.so
+TCL_CFLAGS := $(shell $(PKG_CONFIG) --cflags tcl tk x11 2>/dev/null)
+TCL_LIBS := $(shell $(PKG_CONFIG) --libs tcl tk x11 2>/dev/null)
+
+.PHONY: all clean run test install
+all: $(EXT)
+
+$(BUILD_DIR):
+	mkdir -p $@
+
+$(EXT): c/x11.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -fPIC -shared $(TCL_CFLAGS) -o $@ $< $(TCL_LIBS)
+
+run:
+	TCLPANEL_LIB=$(CURDIR)/$(EXT) $(TCLSH) src/main.tcl
+
+test:
+	$(TCLSH) tests/smoke.tcl
+
+install: all
+	install -d $(DESTDIR)$(PREFIX)/share/tclpanel/src/modules $(DESTDIR)$(PREFIX)/lib/tclpanel
+	install -m 644 src/*.tcl $(DESTDIR)$(PREFIX)/share/tclpanel/src/
+	install -m 644 src/modules/*.tcl $(DESTDIR)$(PREFIX)/share/tclpanel/src/modules/
+	install -m 755 $(EXT) $(DESTDIR)$(PREFIX)/lib/tclpanel/
+
+clean:
+	rm -rf $(BUILD_DIR)

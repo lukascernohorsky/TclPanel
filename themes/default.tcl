@@ -1,0 +1,1 @@
+set ::tclpanel::config::values [dict replace $::tclpanel::config::values background #252a34 foreground #f2f2f2]
