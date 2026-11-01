@@ -55,7 +55,15 @@ proc ::tclpanel::xdg::locale_candidates {} {
             lappend candidates $language
         }
     }
-    return [lsort -unique $candidates]
+    set ordered {}
+    set seen {}
+    foreach candidate $candidates {
+        if {![dict exists $seen $candidate]} {
+            dict set seen $candidate 1
+            lappend ordered $candidate
+        }
+    }
+    return $ordered
 }
 
 proc ::tclpanel::xdg::localize_values {values} {
