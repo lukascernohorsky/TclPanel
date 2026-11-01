@@ -47,6 +47,18 @@ int main(void) {
             XFlush(dpy);
             printf("%lu\n", (unsigned long)icon);
             fflush(stdout);
+        } else if (strcmp(command, "embed") == 0 && icon != None) {
+            Atom xembed = XInternAtom(dpy, "_XEMBED", False);
+            int found = 0;
+            XSync(dpy, False);
+            while (XCheckTypedWindowEvent(dpy, icon, ClientMessage, &ev)) {
+                if (ev.xclient.message_type == xembed &&
+                    ev.xclient.data.l[1] == 0 &&
+                    (Window)ev.xclient.data.l[2] == tray)
+                    found = 1;
+            }
+            printf("%d\\n", found);
+            fflush(stdout);
         } else if (strcmp(command, "unmap") == 0 && icon != None) {
             info[1] = 0;
             XChangeProperty(dpy, icon, xembed_info, xembed_info, 32,

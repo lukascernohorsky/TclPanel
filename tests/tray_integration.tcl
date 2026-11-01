@@ -42,6 +42,11 @@ try {
     flush $channel
     if {[gets $channel iconId] < 0} { error "test client did not create tray icon" }
     wait_for {[::x11::tray_count] == 1} "tray did not accept dock request"
+    puts $channel embed
+    flush $channel
+    if {[gets $channel embedded] < 0 || $embedded != 1} {
+        error "tray did not send XEMBED_EMBEDDED_NOTIFY"
+    }
     wait_client_state $channel 2 "newly docked icon was not mapped"
 
     puts $channel unmap
