@@ -87,7 +87,7 @@ Exec=printf "unterminated
 Type=Application
 Name=Only GNOME
 Exec=only-gnome
-OnlyShowIn=GNOME;KDE;
+OnlyShowIn=KDE;
 }
     write_file [file join $apps notshow.desktop] {
 [Desktop Entry]
