@@ -6,11 +6,11 @@ source [file join $root src config.tcl]
 source [file join $root src/modules/taskbar.tcl]
 source [file join $root src/modules/workspace.tcl]
 
+namespace eval ::mock {}
 set ::mock::current 0
 set ::mock::count 3
 set ::mock::activated {}
 set ::mock::selected {}
-namespace eval ::mock {}
 namespace eval ::x11 {}
 proc ::x11::windows {} { return {{0x10 "Terminal" 0} {0x20 "Editor" 1}} }
 proc ::x11::activate {id} { lappend ::mock::activated $id }
