@@ -365,13 +365,66 @@ static void tray_parent_lost(void) {
     tray_notify();
     Tcl_DoWhenIdle(tray_parent_lost_idle, NULL);
 }
+/* Run one request against a client-owned XID without allowing BadWindow
+ * to reach Xlib's process-wide default handler. */
+static int tray_move_icon(Window win, int x, int y, unsigned int w,
+                          unsigned int h) {
+    XErrorHandler previous;
+    trapped_x_error = 0;
+    XSync(tray_display, False);
+    previous = XSetErrorHandler(tray_validation_error_handler);
+    XMoveResizeWindow(tray_display, win, x, y, w, h);
+    XSync(tray_display, False);
+    XSetErrorHandler(previous);
+    return trapped_x_error == 0;
+}
+static int tray_apply_icon_state(Window win) {
+    Atom actual;
+    int format, mapped = 1, ok = 1;
+    unsigned long nitems, after;
+    unsigned char *data = NULL;
+    XErrorHandler previous;
+    XSync(tray_display, False);
+    trapped_x_error = 0;
+    previous = XSetErrorHandler(tray_validation_error_handler);
+    if (XGetWindowProperty(tray_display, win, tray_xembed_info, 0, 2,
+                           False, tray_xembed_info, &actual, &format,
+                           &nitems, &after, &data) == Success &&
+        data != NULL && actual == tray_xembed_info && format == 32 &&
+        nitems >= 2)
+        mapped = ((((unsigned long *)data)[1] & 1UL) != 0);
+    if (data != NULL) XFree(data);
+    if (trapped_x_error == 0) {
+        if (mapped) XMapWindow(tray_display, win);
+        else XUnmapWindow(tray_display, win);
+    }
+    XSync(tray_display, False);
+    XSetErrorHandler(previous);
+    ok = trapped_x_error == 0;
+    return ok;
+}
+static int tray_configure_icon(const XConfigureRequestEvent *request) {
+    XWindowChanges changes;
+    XErrorHandler previous;
+    changes.x = request->x; changes.y = request->y;
+    changes.width = request->width; changes.height = request->height;
+    changes.border_width = request->border_width;
+    changes.sibling = request->above; changes.stack_mode = request->detail;
+    XSync(tray_display, False);
+    trapped_x_error = 0;
+    previous = XSetErrorHandler(tray_validation_error_handler);
+    XConfigureWindow(tray_display, request->window, request->value_mask,
+                     &changes);
+    XSync(tray_display, False);
+    XSetErrorHandler(previous);
+    return trapped_x_error == 0;
+}
 static void tray_layout(void) {
-    int i, size = tray_icon_size > 0 ? tray_icon_size : tray_height;
+    int i = 0, size = tray_icon_size > 0 ? tray_icon_size : tray_height;
     int gap = tray_icon_gap;
     int content_width;
     if (tray_display == NULL || tray_window == None) return;
     if (!valid_tray_parent(tray_display, tray_window)) {
-        /* A queued layout event may outlive destruction of the parent. */
         tray_parent_lost();
         return;
     }
@@ -380,10 +433,21 @@ static void tray_layout(void) {
     if (gap < 0) gap = 0;
     content_width = tray_icon_count > 0 ?
         tray_icon_count * size + (tray_icon_count - 1) * gap : 0;
-    for (i = 0; i < tray_icon_count; i++)
-        XMoveResizeWindow(tray_display, tray_icons[i],
-                          i * (size + gap), (tray_height - size) / 2,
-                          (unsigned int)size, (unsigned int)size);
+    while (i < tray_icon_count) {
+        if (!tray_move_icon(tray_icons[i], i * (size + gap),
+                            (tray_height - size) / 2,
+                            (unsigned int)size, (unsigned int)size)) {
+            int j;
+            for (j = i; j + 1 < tray_icon_count; j++)
+                tray_icons[j] = tray_icons[j + 1];
+            tray_icon_count--;
+            tray_notify();
+            content_width = tray_icon_count > 0 ?
+                tray_icon_count * size + (tray_icon_count - 1) * gap : 0;
+            continue;
+        }
+        i++;
+    }
     XResizeWindow(tray_display, tray_window,
                   (unsigned int)(content_width > tray_width ?
                                  content_width : tray_width),
@@ -407,9 +471,18 @@ static void tray_stop_internal(void) {
     if (tray_display != NULL) {
         Tcl_DeleteFileHandler(ConnectionNumber(tray_display));
         for (i = 0; i < tray_icon_count; i++) {
+            XErrorHandler previous;
+            XSync(tray_display, False);
+            trapped_x_error = 0;
+            previous = XSetErrorHandler(tray_validation_error_handler);
             XUnmapWindow(tray_display, tray_icons[i]);
-            XReparentWindow(tray_display, tray_icons[i],
-                            DefaultRootWindow(tray_display), 0, 0);
+            XSync(tray_display, False);
+            if (trapped_x_error == 0) {
+                XReparentWindow(tray_display, tray_icons[i],
+                                DefaultRootWindow(tray_display), 0, 0);
+                XSync(tray_display, False);
+            }
+            XSetErrorHandler(previous);
         }
         if (tray_selection != None &&
             XGetSelectionOwner(tray_display, tray_selection) == tray_window)
@@ -454,9 +527,10 @@ static void tray_readable(ClientData cd, int mask) {
                 }
             }
         } else if (ev.type == PropertyNotify && ev.xproperty.atom == tray_xembed_info) {
-            if (tray_icon_is_mapped(ev.xproperty.window)) XMapWindow(tray_display, ev.xproperty.window);
-            else XUnmapWindow(tray_display, ev.xproperty.window);
-            tray_layout();
+            if (!tray_apply_icon_state(ev.xproperty.window))
+                tray_remove_icon(ev.xproperty.window);
+            else
+                tray_layout();
         } else if (ev.type == DestroyNotify) {
             if (ev.xdestroywindow.window == tray_parent ||
                 ev.xdestroywindow.window == tray_window) {
@@ -470,17 +544,10 @@ static void tray_readable(ClientData cd, int mask) {
             }
             tray_remove_icon(ev.xdestroywindow.window);
         } else if (ev.type == ConfigureRequest) {
-            XWindowChanges changes;
-            changes.x = ev.xconfigurerequest.x;
-            changes.y = ev.xconfigurerequest.y;
-            changes.width = ev.xconfigurerequest.width;
-            changes.height = ev.xconfigurerequest.height;
-            changes.border_width = ev.xconfigurerequest.border_width;
-            changes.sibling = ev.xconfigurerequest.above;
-            changes.stack_mode = ev.xconfigurerequest.detail;
-            XConfigureWindow(tray_display, ev.xconfigurerequest.window,
-                             ev.xconfigurerequest.value_mask, &changes);
-            tray_layout();
+            if (!tray_configure_icon(&ev.xconfigurerequest))
+                tray_remove_icon(ev.xconfigurerequest.window);
+            else
+                tray_layout();
         } else if (ev.type == SelectionClear) {
             tray_selection = None;
             tray_notify();

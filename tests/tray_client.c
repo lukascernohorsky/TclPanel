@@ -184,6 +184,14 @@ int main(void) {
                 printf("%d %d %d %d\n", x, y, attr.width, attr.height);
                 fflush(stdout);
             }
+        } else if (strcmp(command, "unmap-destroy") == 0 && icon != None) {
+            info[1] = 0;
+            XChangeProperty(dpy, icon, xembed_info, xembed_info, 32,
+                            PropModeReplace, (unsigned char *)info, 2);
+            XDestroyWindow(dpy, icon);
+            XFlush(dpy);
+            puts("done"); fflush(stdout);
+            icon = None;
         } else if (strcmp(command, "destroy") == 0 && icon != None) {
             XDestroyWindow(dpy, icon);
             XFlush(dpy);

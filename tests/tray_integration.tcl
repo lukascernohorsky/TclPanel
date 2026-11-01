@@ -135,7 +135,7 @@ try {
     }
     wait_client_state $channel 2 "tray ignored _XEMBED_INFO mapped flag"
 
-    puts $channel destroy
+    puts $channel unmap-destroy
     flush $channel
     if {[gets $channel response] < 0 || $response ne "done"} {
         error "test client failed to destroy first icon"
