@@ -17,7 +17,7 @@ proc ::tclpanel::xdg::data_dirs {} {
 
 proc ::tclpanel::xdg::decode_value {value} {
     set backslash [format %c 92]
-    return [string map [list {\\s} { } {\\n} "\n" {\\t} "\t" {\\r} "\r" [string repeat $backslash 2] $backslash] $value]
+    return [string map [list ${backslash}s { } ${backslash}n "\n" ${backslash}t "\t" ${backslash}r "\r" [string repeat $backslash 2] $backslash] $value]
 }
 
 proc ::tclpanel::xdg::visible_for_desktop {entry} {
