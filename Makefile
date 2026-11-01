@@ -20,6 +20,7 @@ run: all
 test:
 	$(TCLSH) tests/smoke.tcl
 	$(TCLSH) tests/xdg_apps.tcl
+	$(TCLSH) tests/modules.tcl
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin \
 		$(DESTDIR)$(PREFIX)/share/tclpanel/src/modules \
