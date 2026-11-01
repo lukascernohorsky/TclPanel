@@ -29,7 +29,8 @@ install: all
 	install -d $(DESTDIR)$(PREFIX)/bin \
 		$(DESTDIR)$(PREFIX)/share/tclpanel/src/modules \
 		$(DESTDIR)$(PREFIX)/lib/tclpanel
-	install -m 755 bin/tclpanel $(DESTDIR)$(PREFIX)/bin/tclpanel
+	sed 's|@PREFIX@|$(PREFIX)|g' bin/tclpanel > $(DESTDIR)$(PREFIX)/bin/tclpanel
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/tclpanel
 	install -m 644 src/*.tcl $(DESTDIR)$(PREFIX)/share/tclpanel/src/
 	install -m 644 src/modules/*.tcl $(DESTDIR)$(PREFIX)/share/tclpanel/src/modules/
 	install -m 755 $(EXT) $(DESTDIR)$(PREFIX)/lib/tclpanel/
