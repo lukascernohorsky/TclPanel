@@ -336,6 +336,10 @@ static void tray_stop_internal(void) {
         tray_callback = NULL;
     }
 }
+static void tray_selection_lost_idle(ClientData cd) {
+    (void)cd;
+    tray_stop_internal();
+}
 static void tray_deleted(ClientData cd, Tcl_Interp *ip) {
     (void)cd;
     if (tray_interp == ip) tray_stop_internal();
@@ -398,7 +402,10 @@ static void tray_readable(ClientData cd, int mask) {
                              ev.xconfigurerequest.value_mask, &changes);
             tray_layout();
         } else if (ev.type == SelectionClear) {
+            tray_selection = None;
             tray_notify();
+            Tcl_DoWhenIdle(tray_selection_lost_idle, NULL);
+            return;
         }
     }
 }
@@ -498,6 +505,16 @@ static int TrayStopCmd(ClientData cd, Tcl_Interp *ip, int objc,
     (void)cd;
     if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
     if (tray_interp == ip) tray_stop_internal();
+    return TCL_OK;
+}
+static int TrayActiveCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                         Tcl_Obj *const objv[]) {
+    int active;
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    active = tray_display != NULL && tray_selection != None &&
+             XGetSelectionOwner(tray_display, tray_selection) == tray_window;
+    Tcl_SetObjResult(ip, Tcl_NewBooleanObj(active));
     return TCL_OK;
 }
 static int TrayCountCmd(ClientData cd, Tcl_Interp *ip, int objc,
@@ -658,6 +675,7 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     Tcl_CreateObjCommand(ip, "::x11::tray_configure", TrayConfigureCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::tray_stop", TrayStopCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::tray_count", TrayCountCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::tray_active", TrayActiveCmd, NULL, NULL);
     Tcl_CallWhenDeleted(ip, tray_deleted, NULL);
     Tcl_CreateObjCommand(ip, "::x11::monitors", MonitorsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::watch_monitors", WatchMonitorsCmd, NULL, NULL);

@@ -6,7 +6,7 @@
 
 int main(void) {
     Display *dpy = XOpenDisplay(NULL);
-    Window parent, icon = None, tray = None;
+    Window parent, icon = None, tray = None, takeover = None;
     Atom opcode, xembed_info;
     unsigned long info[2] = {0, 1};
     XEvent ev;
@@ -81,6 +81,15 @@ int main(void) {
             XFlush(dpy);
             puts("done"); fflush(stdout);
             icon = None;
+        } else if (strcmp(command, "steal") == 0) {
+            char selection_name[64];
+            Atom selection;
+            snprintf(selection_name, sizeof(selection_name), "_NET_SYSTEM_TRAY_S%d", DefaultScreen(dpy));
+            selection = XInternAtom(dpy, selection_name, False);
+            takeover = XCreateSimpleWindow(dpy, DefaultRootWindow(dpy), 0, 0, 1, 1, 0, 0, 0);
+            XSetSelectionOwner(dpy, selection, takeover, CurrentTime);
+            XSync(dpy, False);
+            puts("ok"); fflush(stdout);
         } else if (strcmp(command, "quit") == 0) {
             break;
         } else {
@@ -88,6 +97,15 @@ int main(void) {
         }
     }
     if (icon != None) XDestroyWindow(dpy, icon);
+    if (takeover != None) {
+        char selection_name[64];
+        Atom selection;
+        snprintf(selection_name, sizeof(selection_name), "_NET_SYSTEM_TRAY_S%d", DefaultScreen(dpy));
+        selection = XInternAtom(dpy, selection_name, False);
+        if (XGetSelectionOwner(dpy, selection) == takeover)
+            XSetSelectionOwner(dpy, selection, None, CurrentTime);
+        XDestroyWindow(dpy, takeover);
+    }
     XDestroyWindow(dpy, parent);
     XCloseDisplay(dpy);
     return 0;

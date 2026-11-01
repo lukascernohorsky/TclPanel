@@ -39,6 +39,12 @@ proc ::tclpanel::module::tray::configure {} {
 }
 proc ::tclpanel::module::tray::changed {} {
     variable frame
+    variable started
+    if {![::x11::tray_active]} {
+        set started 0
+        puts stderr "TclPanel: system tray selection was taken by another manager"
+        return
+    }
     if {![winfo exists $frame]} return
     set slots [::x11::tray_count]
     set height [winfo height $frame]

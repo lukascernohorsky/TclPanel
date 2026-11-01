@@ -70,6 +70,14 @@ try {
     }
     wait_for {[::x11::tray_count] == 0} "tray did not remove destroyed icon"
     if {$callbackCount < 2} { error "tray change callback was not invoked" }
+
+    puts $channel steal
+    flush $channel
+    if {[gets $channel response] < 0 || $response ne "ok"} {
+        error "test client failed to take tray selection"
+    }
+    wait_for {![::x11::tray_active]} "tray did not detect selection loss"
+    wait_for {[::x11::tray_count] == 0} "tray did not clean up after selection loss"
     puts "XEmbed integration test passed"
 } finally {
     if {$trayStarted} { catch {::x11::tray_stop} }
