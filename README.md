@@ -1,6 +1,6 @@
 # TclPanel
 
-TclPanel is a standalone X11 desktop panel implemented in Tcl/Tk. It is intended to work with independent EWMH-compatible window managers on FreeBSD and Linux and does not depend on XFCE, GTK, Qt, or libwnck.
+TclPanel is a standalone X11 desktop panel implemented in Tcl/Tk. It is intended to work with EWMH-compatible window managers on FreeBSD and Linux without XFCE, GTK, Qt, or libwnck.
 
 ## Build and run
 
@@ -12,18 +12,17 @@ make test
 make run
 ```
 
-The launcher uses `wish`; `TCLSH` is used only for non-GUI tests. Override `WISH`, `TCLSH`, `CC`, `PKG_CONFIG`, or `TCL_PKGS` when required by the platform packaging.
-
 Install with `make install PREFIX=/usr/local`, then start with `tclpanel`. `DESTDIR` is supported for staged package builds.
 
-On Debian/Ubuntu install Tcl/Tk and X11 development packages (for example `tcl-dev tk-dev libx11-dev pkg-config`). On FreeBSD install the Tcl/Tk and Xorg development packages appropriate to the installed Tcl/Tk version.
+## Current implementation
 
-## Configuration
+- Tcl/Tk panel shell, user Tcl configuration and loadable module structure.
+- Xlib extension with EWMH client-window enumeration, activation, desktop count/current desktop/switching, and dock/strut properties.
+- Taskbar and workspace switcher use the Xlib extension when loaded; taskbar/workspace retain limited `wmctrl` fallback.
+- Basic launcher currently contains a small fixed application list.
 
-The first run creates `~/.config/tclpanel/config.tcl`. It is executable Tcl code; only use a configuration file you control.
+## Known limitations
 
-## Status and limitations
+The Xlib layer currently targets a single X screen and EWMH-compatible window managers. It does not yet implement event-driven updates, monitor-specific struts, XRandR hotplug, XEmbed system tray, full XDG .desktop menu discovery, or platform-specific system monitoring and power management. EWMH support varies by window manager.
 
-This is an early source implementation, not a feature-complete replacement for xfce4-panel. The task list and workspace module use `wmctrl` when available. The C extension publishes a basic full-width top/bottom EWMH strut and dock window properties. It does not implement partial struts, monitor-specific geometry, XRandR hotplug/multi-monitor placement, XEmbed system-tray management, full XDG desktop-file menu parsing, platform power-policy integration, or FreeBSD/Linux-specific system monitoring.
-
-No runtime test against a live X server or multiple window managers is claimed.
+The C extension and GUI must be built and tested on the target host; no live-X-server or FreeBSD build result is claimed here.
