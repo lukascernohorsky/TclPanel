@@ -57,7 +57,7 @@ int main(void) {
                     (Window)ev.xclient.data.l[2] == tray)
                     found = 1;
             }
-            printf("%d\\n", found);
+            printf("%d\n", found);
             fflush(stdout);
         } else if (strcmp(command, "unmap") == 0 && icon != None) {
             info[1] = 0;
