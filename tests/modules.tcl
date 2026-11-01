@@ -16,7 +16,10 @@ proc ::x11::windows {} { return {{0x10 "Terminal" 0} {0x20 "Editor" 1}} }
 proc ::x11::activate {id} { lappend ::mock::activated $id }
 proc ::x11::current_desktop {} { return $::mock::current }
 proc ::x11::desktops {} { return $::mock::count }
-proc ::x11::set_desktop {index} { lappend ::mock::selected $index }
+proc ::x11::set_desktop {index} {
+    lappend ::mock::selected $index
+    set ::mock::current $index
+}
 
 proc assert_equal {actual expected message} {
     if {$actual ne $expected} { error "$message: expected <$expected>, got <$actual>" }

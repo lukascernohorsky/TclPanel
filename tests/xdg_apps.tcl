@@ -82,6 +82,24 @@ Exec=printf "unterminated
     assert_equal [lindex $argv 1] {APP_TITLE=Text Editor} "Quoted argument preservation"
     assert_equal [lindex $argv 2] editor "Exec field code"
     assert_equal [lindex $argv 3] %f "Literal percent"
+    write_file [file join $apps onlyshow.desktop] {
+[Desktop Entry]
+Type=Application
+Name=Only GNOME
+Exec=only-gnome
+OnlyShowIn=GNOME;KDE;
+}
+    write_file [file join $apps notshow.desktop] {
+[Desktop Entry]
+Type=Application
+Name=Not GNOME
+Exec=not-gnome
+NotShowIn=GNOME;
+}
+    set ::env(XDG_CURRENT_DESKTOP) GNOME
+    assert_equal [::tclpanel::xdg::parse_file [file join $apps onlyshow.desktop]] "" "OnlyShowIn filtering"
+    assert_equal [::tclpanel::xdg::parse_file [file join $apps notshow.desktop]] "" "NotShowIn filtering"
+    unset ::env(XDG_CURRENT_DESKTOP)
     set q [::tclpanel::xdg::parse_file [file join $apps quoted.desktop]]
     assert_equal [::tclpanel::xdg::tokenize_exec [dict get $q Exec]] {/usr/bin/printf {hello world} %%c} "Exec tokenization"
     assert_true {[catch {::tclpanel::xdg::tokenize_exec [dict get [::tclpanel::xdg::parse_file [file join $apps badquote.desktop]] Exec]}]} "Malformed Exec must fail"
