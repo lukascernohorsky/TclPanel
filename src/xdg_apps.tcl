@@ -137,22 +137,26 @@ proc ::tclpanel::xdg::icon_path {icon {size 24}} {
     foreach base [::tclpanel::xdg::data_dirs] {
         foreach theme {Adwaita hicolor} {
             foreach candidate_size $sizes {
+                set dimension [format "%sx%s" $candidate_size $candidate_size]
                 foreach category {apps categories status devices places mimetypes} {
                     foreach ext {png gif ppm} {
-                        set path [file join $base icons $theme \${candidate_size}x\${candidate_size} $category \${icon}.\${ext}]
+                        set filename [format "%s.%s" $icon $ext]
+                        set path [file join $base icons $theme $dimension $category $filename]
                         if {[file isfile $path]} { return $path }
                     }
                 }
             }
             foreach category {apps categories status devices places mimetypes} {
                 foreach ext {png gif ppm} {
-                    set path [file join $base icons $theme scalable $category \${icon}.\${ext}]
+                    set filename [format "%s.%s" $icon $ext]
+                    set path [file join $base icons $theme scalable $category $filename]
                     if {[file isfile $path]} { return $path }
                 }
             }
         }
         foreach ext {png gif ppm} {
-            set path [file join $base pixmaps \${icon}.\${ext}]
+            set filename [format "%s.%s" $icon $ext]
+            set path [file join $base pixmaps $filename]
             if {[file isfile $path]} { return $path }
         }
     }
