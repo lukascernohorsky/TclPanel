@@ -5,8 +5,9 @@ CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra
 BUILD_DIR = build
 EXT = $(BUILD_DIR)/libtclpanelx11.so
-TCL_CFLAGS := $(shell $(PKG_CONFIG) --cflags tcl tk x11 2>/dev/null)
-TCL_LIBS := $(shell $(PKG_CONFIG) --libs tcl tk x11 2>/dev/null)
+TCL_PKGS ?= tcl tk x11
+TCL_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(TCL_PKGS) 2>/dev/null)
+TCL_LIBS := $(shell $(PKG_CONFIG) --libs $(TCL_PKGS) 2>/dev/null)
 
 .PHONY: all clean run test install
 all: $(EXT)
@@ -17,7 +18,7 @@ $(BUILD_DIR):
 $(EXT): c/x11.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -fPIC -shared $(TCL_CFLAGS) -o $@ $< $(TCL_LIBS)
 
-run:
+run: all
 	TCLPANEL_LIB=$(CURDIR)/$(EXT) $(TCLSH) src/main.tcl
 
 test:
