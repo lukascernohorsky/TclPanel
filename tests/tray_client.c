@@ -66,6 +66,18 @@ int main(void) {
             XFlush(dpy);
             printf("%lu\n", (unsigned long)icon2);
             fflush(stdout);
+        } else if (strcmp(command, "redock") == 0 && icon != None && tray != None) {
+            memset(&ev, 0, sizeof(ev));
+            ev.xclient.type = ClientMessage;
+            ev.xclient.window = tray;
+            ev.xclient.message_type = opcode;
+            ev.xclient.format = 32;
+            ev.xclient.data.l[0] = CurrentTime;
+            ev.xclient.data.l[1] = 0;
+            ev.xclient.data.l[2] = (long)icon;
+            XSendEvent(dpy, tray, False, NoEventMask, &ev);
+            XFlush(dpy);
+            puts("ok"); fflush(stdout);
         } else if (strcmp(command, "embed") == 0 && icon != None) {
             Atom xembed = XInternAtom(dpy, "_XEMBED", False);
             int found = 0;

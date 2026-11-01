@@ -51,6 +51,24 @@ try {
     flush $channel
     if {[gets $channel iconId] < 0} { error "test client did not create tray icon" }
     wait_for {[::x11::tray_count] == 1} "tray did not accept dock request"
+
+    # A client retrying the same dock request must not create a duplicate slot
+    # or trigger a second layout-change callback.
+    set callbacksBeforeRedock $callbackCount
+    puts $channel redock
+    flush $channel
+    if {[gets $channel response] < 0 || $response ne "ok"} {
+        error "test client failed to resend dock request"
+    }
+    after 50
+    update
+    if {[::x11::tray_count] != 1} {
+        error "tray added a duplicate icon after repeated dock request"
+    }
+    if {$callbackCount != $callbacksBeforeRedock} {
+        error "duplicate dock request triggered an unnecessary change callback"
+    }
+
     puts $channel embed
     flush $channel
     if {[gets $channel embedded] < 0 || $embedded != 1} {
