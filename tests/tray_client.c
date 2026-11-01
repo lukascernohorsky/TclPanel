@@ -10,6 +10,7 @@ int main(void) {
     Atom opcode, xembed_info;
     unsigned long info[2] = {0, 1};
     XEvent ev;
+    XWindowAttributes attr;
     char command[128];
 
     if (dpy == NULL) {
@@ -58,6 +59,11 @@ int main(void) {
                             PropModeReplace, (unsigned char *)info, 2);
             XFlush(dpy);
             puts("ok"); fflush(stdout);
+        } else if (strcmp(command, "state") == 0 && icon != None) {
+            XSync(dpy, False);
+            if (!XGetWindowAttributes(dpy, icon, &attr)) return 3;
+            printf("%d\n", attr.map_state);
+            fflush(stdout);
         } else if (strcmp(command, "destroy") == 0 && icon != None) {
             XDestroyWindow(dpy, icon);
             XFlush(dpy);

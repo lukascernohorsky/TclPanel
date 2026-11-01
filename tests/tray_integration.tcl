@@ -13,6 +13,20 @@ proc wait_for {condition message} {
     }
     error $message
 }
+proc client_state {channel} {
+    puts $channel state
+    flush $channel
+    if {[gets $channel value] < 0} { error "client state query failed" }
+    return $value
+}
+proc wait_client_state {channel expected message} {
+    for {set i 0} {$i < 80} {incr i} {
+        update
+        if {[client_state $channel] == $expected} { return }
+        after 25
+    }
+    error $message
+}
 
 set callbackCount 0
 proc tray_changed {} { incr ::callbackCount }
@@ -28,20 +42,21 @@ try {
     flush $channel
     if {[gets $channel iconId] < 0} { error "test client did not create tray icon" }
     wait_for {[::x11::tray_count] == 1} "tray did not accept dock request"
+    wait_client_state $channel 2 "newly docked icon was not mapped"
 
     puts $channel unmap
     flush $channel
     if {[gets $channel response] < 0 || $response ne "ok"} {
         error "test client failed to send unmap state"
     }
-    update
+    wait_client_state $channel 0 "tray ignored _XEMBED_INFO unmapped flag"
+
     puts $channel map
     flush $channel
     if {[gets $channel response] < 0 || $response ne "ok"} {
         error "test client failed to send map state"
     }
-    update
-    if {[::x11::tray_count] != 1} { error "mapped-state changes removed tray icon" }
+    wait_client_state $channel 2 "tray ignored _XEMBED_INFO mapped flag"
 
     puts $channel destroy
     flush $channel
@@ -49,6 +64,7 @@ try {
         error "test client failed to destroy icon"
     }
     wait_for {[::x11::tray_count] == 0} "tray did not remove destroyed icon"
+    if {$callbackCount < 2} { error "tray change callback was not invoked" }
     puts "XEmbed integration test passed"
 } finally {
     if {$trayStarted} { catch {::x11::tray_stop} }
