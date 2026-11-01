@@ -64,7 +64,7 @@ int main(void) {
             ev.xclient.data.l[2] = (long)icon2;
             XSendEvent(dpy, tray, False, NoEventMask, &ev);
             XFlush(dpy);
-            printf("%lu\\n", (unsigned long)icon2);
+            printf("%lu\n", (unsigned long)icon2);
             fflush(stdout);
         } else if (strcmp(command, "embed") == 0 && icon != None) {
             Atom xembed = XInternAtom(dpy, "_XEMBED", False);
@@ -112,7 +112,7 @@ int main(void) {
                 Window child;
                 int x, y;
                 XTranslateCoordinates(dpy, icon2, tray, 0, 0, &x, &y, &child);
-                printf("%d %d %d %d\\n", x, y, attr.width, attr.height);
+                printf("%d %d %d %d\n", x, y, attr.width, attr.height);
                 fflush(stdout);
             }
         } else if (strcmp(command, "destroy") == 0 && icon != None) {
