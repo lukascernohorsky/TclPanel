@@ -6,7 +6,7 @@ CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra
 BUILD_DIR = build
 EXT = $(BUILD_DIR)/libtclpanelx11.so
-TCL_PKGS ?= tcl tk x11
+TCL_PKGS ?= tcl tk x11 xrandr
 TCL_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(TCL_PKGS) 2>/dev/null)
 TCL_LIBS := $(shell $(PKG_CONFIG) --libs $(TCL_PKGS) 2>/dev/null)
 .PHONY: all clean run test install

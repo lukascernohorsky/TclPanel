@@ -1,6 +1,7 @@
 #include <tcl.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
+#include <X11/extensions/Xrandr.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -234,6 +235,60 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
     XFlush(dpy); XCloseDisplay(dpy);
     return TCL_OK;
 }
+
+static int MonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                       Tcl_Obj *const objv[]) {
+    Display *dpy;
+    Window root;
+    XRRMonitorInfo *monitors;
+    int count = 0, i;
+    Tcl_Obj *result;
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    dpy = open_display(ip);
+    if (dpy == NULL) return TCL_ERROR;
+    root = DefaultRootWindow(dpy);
+    monitors = XRRGetMonitors(dpy, root, True, &count);
+    result = Tcl_NewListObj(0, NULL);
+    if (monitors != NULL && count > 0) {
+        for (i = 0; i < count; i++) {
+            Tcl_Obj *entry = Tcl_NewDictObj();
+            char *name = XGetAtomName(dpy, monitors[i].name);
+            Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("name", -1),
+                           Tcl_NewStringObj(name != NULL ? name : "monitor", -1));
+            if (name != NULL) XFree(name);
+            Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("x", -1),
+                           Tcl_NewIntObj(monitors[i].x));
+            Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("y", -1),
+                           Tcl_NewIntObj(monitors[i].y));
+            Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("width", -1),
+                           Tcl_NewIntObj(monitors[i].width));
+            Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("height", -1),
+                           Tcl_NewIntObj(monitors[i].height));
+            Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("primary", -1),
+                           Tcl_NewBooleanObj(monitors[i].primary != False));
+            Tcl_ListObjAppendElement(ip, result, entry);
+        }
+        XRRFreeMonitors(monitors);
+    } else {
+        Tcl_Obj *entry = Tcl_NewDictObj();
+        Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("name", -1),
+                       Tcl_NewStringObj("screen", -1));
+        Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("x", -1), Tcl_NewIntObj(0));
+        Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("y", -1), Tcl_NewIntObj(0));
+        Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("width", -1),
+                       Tcl_NewIntObj(DisplayWidth(dpy, DefaultScreen(dpy))));
+        Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("height", -1),
+                       Tcl_NewIntObj(DisplayHeight(dpy, DefaultScreen(dpy))));
+        Tcl_DictObjPut(ip, entry, Tcl_NewStringObj("primary", -1),
+                       Tcl_NewBooleanObj(1));
+        Tcl_ListObjAppendElement(ip, result, entry);
+    }
+    XCloseDisplay(dpy);
+    Tcl_SetObjResult(ip, result);
+    return TCL_OK;
+}
+
 #ifdef _WIN32
 __declspec(dllexport)
 #endif
@@ -242,11 +297,12 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     if (Tcl_FindNamespace(ip, "::x11", NULL, TCL_GLOBAL_ONLY) == NULL)
         Tcl_CreateNamespace(ip, "::x11", NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::strut", StrutCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::monitors", MonitorsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::windows", WindowsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::activate", ActivateCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::desktops", DesktopsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::current_desktop", CurrentDesktopCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::set_desktop", SetDesktopCmd, NULL, NULL);
-    Tcl_PkgProvide(ip, "tclpanelx11", "0.4");
+    Tcl_PkgProvide(ip, "tclpanelx11", "0.5");
     return TCL_OK;
 }

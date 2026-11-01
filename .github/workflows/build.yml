@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config tcl-dev tk-dev libx11-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config tcl-dev tk-dev libx11-dev libxrandr-dev
       - name: Build X11 extension
         run: make
       - name: Run Tcl smoke tests
