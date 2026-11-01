@@ -7,6 +7,7 @@ set ::tclpanel::root [file normalize [file join [file dirname [info script]] ..]
 source [file join $::tclpanel::root src config.tcl]
 source [file join $::tclpanel::root src panel.tcl]
 source [file join $::tclpanel::root src module_manager.tcl]
+source [file join $::tclpanel::root src xdg_apps.tcl]
 
 if {[info exists ::env(TCLPANEL_LIB)] && [file isfile $::env(TCLPANEL_LIB)]} {
     if {[catch {load $::env(TCLPANEL_LIB) Tclpanelx11} err]} {

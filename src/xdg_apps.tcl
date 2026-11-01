@@ -22,8 +22,10 @@ proc ::tclpanel::xdg::decode_value {value} {
 proc ::tclpanel::xdg::visible_for_desktop {entry} {
     set current {}
     if {[info exists ::env(XDG_CURRENT_DESKTOP)]} { set current [split [string toupper $::env(XDG_CURRENT_DESKTOP)] :] }
-    set only [dict get $entry OnlyShowIn]
-    set not [dict get $entry NotShowIn]
+    set only [split [string trim [dict get $entry OnlyShowIn] ";"] ";"]
+    set not [split [string trim [dict get $entry NotShowIn] ";"] ";"]
+    if {$only eq {}} { set only {} }
+    if {$not eq {}} { set not {} }
     if {[llength $only]} {
         set matched 0
         foreach desktop $only { if {[string toupper $desktop] in $current} { set matched 1 } }
@@ -109,11 +111,13 @@ proc ::tclpanel::xdg::tokenize_exec {command} {
 proc ::tclpanel::xdg::exec_argv {entry} {
     set name [dict get $entry Name]; set icon [dict get $entry Icon]; set desktopfile [dict get $entry DesktopFile]
     set result {}
+    set literal_percent [format %c 1]
     foreach token [::tclpanel::xdg::tokenize_exec [dict get $entry Exec]] {
         if {$token in {%f %F %u %U}} { continue }
         if {$token eq "%i"} { if {$icon ne ""} { lappend result --icon $icon }; continue }
-        set token [string map [list %% % %c $name %k $desktopfile] $token]
+        set token [string map [list %% $literal_percent %c $name %k $desktopfile] $token]
         if {[regexp {%[A-Za-z]} $token]} { continue }
+        set token [string map [list $literal_percent %] $token]
         lappend result $token
     }
     if {![llength $result]} { error "Desktop Entry Exec expands to an empty command" }
