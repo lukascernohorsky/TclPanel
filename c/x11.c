@@ -8,7 +8,8 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
                     Tcl_Obj *const objv[]) {
     Display *dpy;
     Window win;
-    Atom partial, basic;
+    Atom partial, basic, type, dock, state;
+    Atom state_values[4];
     unsigned long values[12] = {0};
     const char *edge, *window_text;
     int thickness, width;
@@ -45,6 +46,7 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
 
     width = DisplayWidth(dpy, DefaultScreen(dpy));
     win = (Window)id;
+
     if (strcmp(edge, "top") == 0) {
         values[2] = (unsigned long)thickness;
         values[8] = 0;
@@ -61,6 +63,21 @@ static int StrutCmd(ClientData cd, Tcl_Interp *ip, int objc,
                     (unsigned char *)values, 12);
     XChangeProperty(dpy, win, basic, XA_CARDINAL, 32, PropModeReplace,
                     (unsigned char *)values, 4);
+
+    /* Publish dock semantics and keep the panel out of task lists. */
+    type = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
+    dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+    XChangeProperty(dpy, win, type, XA_ATOM, 32, PropModeReplace,
+                    (unsigned char *)&dock, 1);
+
+    state = XInternAtom(dpy, "_NET_WM_STATE", False);
+    state_values[0] = XInternAtom(dpy, "_NET_WM_STATE_ABOVE", False);
+    state_values[1] = XInternAtom(dpy, "_NET_WM_STATE_STICKY", False);
+    state_values[2] = XInternAtom(dpy, "_NET_WM_STATE_SKIP_TASKBAR", False);
+    state_values[3] = XInternAtom(dpy, "_NET_WM_STATE_SKIP_PAGER", False);
+    XChangeProperty(dpy, win, state, XA_ATOM, 32, PropModeReplace,
+                    (unsigned char *)state_values, 4);
+
     XFlush(dpy);
     XCloseDisplay(dpy);
     return TCL_OK;
@@ -77,6 +94,6 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
         Tcl_CreateNamespace(ip, "::x11", NULL, NULL);
     }
     Tcl_CreateObjCommand(ip, "::x11::strut", StrutCmd, NULL, NULL);
-    Tcl_PkgProvide(ip, "tclpanelx11", "0.2");
+    Tcl_PkgProvide(ip, "tclpanelx11", "0.3");
     return TCL_OK;
 }

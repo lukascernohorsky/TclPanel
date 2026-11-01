@@ -1,0 +1,4 @@
+#!/bin/sh
+prefix="@PREFIX@"
+export TCLPANEL_LIB="${TCLPANEL_LIB:-$prefix/lib/tclpanel/libtclpanelx11.so}"
+exec wish "$prefix/share/tclpanel/src/main.tcl" "$@"
