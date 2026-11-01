@@ -260,6 +260,7 @@ static Window tray_parent = None;
 static Window tray_icons[128];
 static int tray_icon_count = 0;
 static int tray_width = 1, tray_height = 24;
+static int tray_icon_size = 0, tray_icon_gap = 0;
 static int tray_screen = 0;
 static Tcl_Obj *tray_callback = NULL;
 static Atom tray_selection = None;
@@ -290,14 +291,21 @@ static int tray_icon_is_mapped(Window win) {
     return mapped;
 }
 static void tray_layout(void) {
-    int i, size = tray_height;
+    int i, size = tray_icon_size > 0 ? tray_icon_size : tray_height;
+    int gap = tray_icon_gap;
+    int content_width;
     if (size < 1) size = 1;
+    if (size > tray_height) size = tray_height;
+    if (gap < 0) gap = 0;
+    content_width = tray_icon_count > 0 ?
+        tray_icon_count * size + (tray_icon_count - 1) * gap : 0;
     for (i = 0; i < tray_icon_count; i++)
-        XMoveResizeWindow(tray_display, tray_icons[i], i * size, 0,
+        XMoveResizeWindow(tray_display, tray_icons[i],
+                          i * (size + gap), (tray_height - size) / 2,
                           (unsigned int)size, (unsigned int)size);
     XResizeWindow(tray_display, tray_window,
-                  (unsigned int)(tray_icon_count * size > tray_width ?
-                                 tray_icon_count * size : tray_width),
+                  (unsigned int)(content_width > tray_width ?
+                                 content_width : tray_width),
                   (unsigned int)tray_height);
     XFlush(tray_display);
 }
@@ -437,6 +445,7 @@ static int TrayStartCmd(ClientData cd, Tcl_Interp *ip, int objc,
     }
     tray_interp = ip; tray_parent = (Window)parent;
     tray_width = width; tray_height = height;
+    tray_icon_size = 0; tray_icon_gap = 0;
     tray_screen = DefaultScreen(tray_display);
     tray_window = XCreateSimpleWindow(tray_display, tray_parent, 0, 0,
                                       (unsigned int)width, (unsigned int)height,
@@ -489,14 +498,24 @@ static int TrayStartCmd(ClientData cd, Tcl_Interp *ip, int objc,
 }
 static int TrayConfigureCmd(ClientData cd, Tcl_Interp *ip, int objc,
                             Tcl_Obj *const objv[]) {
-    int width, height;
+    int width, height, icon_size = 0, gap = 0;
     (void)cd;
-    if (objc != 3) { Tcl_WrongNumArgs(ip, 1, objv, "width height"); return TCL_ERROR; }
+    if (objc != 3 && objc != 5) {
+        Tcl_WrongNumArgs(ip, 1, objv, "width height ?iconSize gap?");
+        return TCL_ERROR;
+    }
     if (Tcl_GetIntFromObj(ip, objv[1], &width) != TCL_OK ||
         Tcl_GetIntFromObj(ip, objv[2], &height) != TCL_OK) return TCL_ERROR;
+    if (objc == 5 &&
+        (Tcl_GetIntFromObj(ip, objv[3], &icon_size) != TCL_OK ||
+         Tcl_GetIntFromObj(ip, objv[4], &gap) != TCL_OK)) return TCL_ERROR;
+    if (width < 1 || height < 1 || icon_size < 0 || gap < 0) {
+        Tcl_SetObjResult(ip, Tcl_NewStringObj("tray dimensions must be positive and icon size/gap non-negative", -1));
+        return TCL_ERROR;
+    }
     if (tray_display == NULL) return TCL_OK;
-    if (width < 1 || height < 1) return TCL_OK;
     tray_width = width; tray_height = height;
+    tray_icon_size = icon_size; tray_icon_gap = gap;
     tray_layout();
     return TCL_OK;
 }

@@ -1,9 +1,13 @@
 namespace eval ::tclpanel::module::tray {
     variable frame {}
     variable started 0
+    variable iconSize
+    variable gap
 }
 proc ::tclpanel::module::tray::create {parent} {
     variable frame
+    variable iconSize [::tclpanel::config::get tray_icon_size 0]
+    variable gap [::tclpanel::config::get tray_icon_gap 2]
     frame $parent.tray -background [::tclpanel::config::get background] \
         -width 8 -height [::tclpanel::config::get height 36]
     pack $parent.tray -side right -fill y
@@ -29,12 +33,32 @@ proc ::tclpanel::module::tray::start {} {
         return
     }
     set started 1
+    ::tclpanel::module::tray::apply_layout
 }
 proc ::tclpanel::module::tray::configure {} {
     variable frame
     variable started
     if {$started && [winfo exists $frame]} {
-        catch {::x11::tray_configure [winfo width $frame] [winfo height $frame]}
+        ::tclpanel::module::tray::apply_layout
+    }
+}
+proc ::tclpanel::module::tray::apply_layout {} {
+    variable frame
+    variable iconSize
+    variable gap
+    if {![winfo exists $frame]} return
+    set height [winfo height $frame]
+    if {$height < 1} { set height [::tclpanel::config::get height 36] }
+    set size $iconSize
+    if {$size <= 0 || $size > $height} { set size $height }
+    set slots 0
+    if {[llength [info commands ::x11::tray_count]]} {
+        set slots [::x11::tray_count]
+    }
+    set width [expr {max(8, $slots * $size + max(0, $slots - 1) * $gap)}]
+    $frame configure -width $width
+    if {$::tclpanel::module::tray::started} {
+        catch {::x11::tray_configure $width $height $size $gap}
     }
 }
 proc ::tclpanel::module::tray::changed {} {
@@ -46,11 +70,7 @@ proc ::tclpanel::module::tray::changed {} {
         return
     }
     if {![winfo exists $frame]} return
-    set slots [::x11::tray_count]
-    set height [winfo height $frame]
-    if {$height < 1} { set height [::tclpanel::config::get height 36] }
-    $frame configure -width [expr {max(8, $slots * $height)}]
-    catch {::x11::tray_configure [winfo width $frame] $height}
+    ::tclpanel::module::tray::apply_layout
 }
 proc ::tclpanel::module::tray::destroyed {w} {
     variable started

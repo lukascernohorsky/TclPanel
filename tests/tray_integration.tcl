@@ -49,6 +49,13 @@ try {
     }
     wait_client_state $channel 2 "newly docked icon was not mapped"
 
+    ::x11::tray_configure 100 24 16 4
+    puts $channel geometry
+    flush $channel
+    if {[gets $channel geometry] < 0 || $geometry ne "0 4 16 16"} {
+        error "tray icon was not centered and resized: $geometry"
+    }
+
     puts $channel unmap
     flush $channel
     if {[gets $channel response] < 0 || $response ne "ok"} {

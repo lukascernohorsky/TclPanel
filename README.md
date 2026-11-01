@@ -35,7 +35,7 @@ The Xlib layer targets a single X screen and EWMH-compatible window managers. Ev
 
 ### System tray
 
-The `tray` module implements the freedesktop System Tray selection and XEmbed docking path through the X11 extension. It claims `_NET_SYSTEM_TRAY_Sn`, announces the manager, accepts dock requests, reparents client windows into its native X11 container, and tracks icon destruction. A running window manager or desktop environment that already owns the system tray selection must be configured not to provide a competing tray. The initial implementation uses a horizontal layout and a fixed icon slot based on panel height.
+The `tray` module implements the freedesktop System Tray selection and XEmbed docking path through the X11 extension. It claims `_NET_SYSTEM_TRAY_Sn`, announces the manager, accepts dock requests, reparents client windows into its native X11 container, and tracks icon destruction. A running window manager or desktop environment that already owns the system tray selection must be configured not to provide a competing tray. The tray uses a horizontal layout with configurable icon size (`tray_icon_size`, where `0` means automatic panel-height sizing) and inter-icon spacing (`tray_icon_gap`). Icons are centered vertically and kept square; icon size is clamped to the panel height.
 
 
 ### System tray integration testing
