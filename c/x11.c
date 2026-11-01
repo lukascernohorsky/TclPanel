@@ -315,10 +315,27 @@ static int tray_icon_is_mapped(Window win) {
     if (data != NULL) XFree(data);
     return mapped;
 }
+static void tray_parent_lost_idle(ClientData cd) {
+    (void)cd;
+    tray_stop_internal();
+}
+static void tray_parent_lost(void) {
+    tray_icon_count = 0;
+    tray_window = None;
+    tray_parent = None;
+    tray_notify();
+    Tcl_DoWhenIdle(tray_parent_lost_idle, NULL);
+}
 static void tray_layout(void) {
     int i, size = tray_icon_size > 0 ? tray_icon_size : tray_height;
     int gap = tray_icon_gap;
     int content_width;
+    if (tray_display == NULL || tray_window == None) return;
+    if (!valid_tray_parent(tray_display, tray_window)) {
+        /* A queued layout event may outlive destruction of the parent. */
+        tray_parent_lost();
+        return;
+    }
     if (size < 1) size = 1;
     if (size > tray_height) size = tray_height;
     if (gap < 0) gap = 0;
@@ -370,10 +387,6 @@ static void tray_stop_internal(void) {
     }
 }
 static void tray_selection_lost_idle(ClientData cd) {
-    (void)cd;
-    tray_stop_internal();
-}
-static void tray_parent_lost_idle(ClientData cd) {
     (void)cd;
     tray_stop_internal();
 }
@@ -432,11 +445,7 @@ static void tray_readable(ClientData cd, int mask) {
                  * any docked icons have already been destroyed by the server;
                  * do not issue cleanup requests against those stale XIDs.
                  */
-                tray_icon_count = 0;
-                tray_window = None;
-                tray_parent = None;
-                tray_notify();
-                Tcl_DoWhenIdle(tray_parent_lost_idle, NULL);
+                tray_parent_lost();
                 return;
             }
             tray_remove_icon(ev.xdestroywindow.window);
