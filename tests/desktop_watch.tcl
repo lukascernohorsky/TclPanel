@@ -25,6 +25,9 @@ try {
     if {[::x11::current_desktop] != 1 || [::x11::desktops] != 4} {
         error "initial EWMH desktop properties were not read correctly"
     }
+    if {[::x11::desktop_names] ne {One Two Three Four}} {
+        error "initial EWMH desktop names were not parsed: [::x11::desktop_names]"
+    }
     ::x11::watch_desktops desktops_changed
     set watching 1
     send_client $channel "current 2"
@@ -37,6 +40,9 @@ try {
     set before $callbacks
     send_client $channel names
     wait_for {$callbacks > $before} "_NET_DESKTOP_NAMES change did not invoke callback"
+    if {[::x11::desktop_names] ne {Alpha Beta Gamma}} {
+        error "updated EWMH desktop names were not parsed: [::x11::desktop_names]"
+    }
     ::x11::unwatch_desktops
     set watching 0
     set before $callbacks
