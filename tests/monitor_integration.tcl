@@ -69,11 +69,11 @@ assert {[dict get [lindex $changed 0] width] == 1280 &&
 assert {[::tclpanel::panel::geometry_for_monitor [lindex $changed 0] 36 bottom] eq "1280x36+0+988"} \
     "panel geometry changed unexpectedly after physical-size update"
 
-# Add a synthetic logical monitor with no physical output. This exercises the
-# RRNotify/resource-change path and verifies that the query returns fresh
-# geometry rather than merely invoking the callback.
+# Rename/reconfigure the Xvfb output as a synthetic logical monitor. Binding
+# the monitor to the active output ensures XRRGetMonitors(get_active=True)
+# reports it, and exercises the RRNotify/resource-change path.
 set before_add $::monitor_events
-if {[catch {exec xrandr --setmonitor TclPanelTestRight 640/160x1024/270+640+0 none} err]} {
+if {[catch {exec xrandr --setmonitor TclPanelTestRight 1280/340x1024/270+0+0 screen} err]} {
     ::x11::unwatch_monitors
     puts stderr "FAIL: could not add synthetic RandR monitor: $err"
     exit 1
@@ -82,10 +82,10 @@ assert {[wait_for_monitor_event $before_add]} "no XRandR callback after logical 
 set with_logical [::x11::monitors]
 set logical [monitor_named $with_logical TclPanelTestRight]
 assert {$logical ne ""} "new logical monitor missing from ::x11::monitors: $with_logical"
-assert {[dict get $logical x] == 640 && [dict get $logical y] == 0 &&
-        [dict get $logical width] == 640 && [dict get $logical height] == 1024} \
+assert {[dict get $logical x] == 0 && [dict get $logical y] == 0 &&
+        [dict get $logical width] == 1280 && [dict get $logical height] == 1024} \
     "logical monitor geometry is incorrect: $logical"
-assert {[::tclpanel::panel::geometry_for_monitor $logical 36 bottom] eq "640x36+640+988"} \
+assert {[::tclpanel::panel::geometry_for_monitor $logical 36 bottom] eq "1280x36+0+988"} \
     "panel geometry for logical monitor is incorrect"
 
 # Removing the logical monitor must also trigger a refresh and remove it from
