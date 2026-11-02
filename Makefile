@@ -13,7 +13,7 @@ all: $(EXT)
 $(BUILD_DIR):
 	mkdir -p $@
 $(EXT): c/x11.c $(BUILD_DIR)
-	$(CC) $(CFLAGS) -fPIC -shared `$(PKG_CONFIG) --cflags $(TCL_PKGS)` -o $@ $< `$(PKG_CONFIG) --libs $(TCL_PKGS)`
+	$(CC) $(CFLAGS) -fPIC -shared `$(PKG_CONFIG) --cflags $(TCL_PKGS)` -o $@ c/x11.c `$(PKG_CONFIG) --libs $(TCL_PKGS)`
 test-x11-load: all
 	$(TCLSH) tests/x11_load.tcl $(CURDIR)/$(EXT)
 run: all
@@ -24,15 +24,15 @@ test: all
 	$(TCLSH) tests/modules.tcl
 	$(TCLSH) tests/x11_load.tcl $(CURDIR)/$(EXT)
 $(BUILD_DIR)/tray-test-client: tests/tray_client.c $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
+	$(CC) $(CFLAGS) -o $@ tests/tray_client.c `$(PKG_CONFIG) --libs x11`
 test-tray: all $(BUILD_DIR)/tray-test-client
 	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/tray_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/tray-test-client; else $(TCLSH) tests/tray_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/tray-test-client; fi
 $(BUILD_DIR)/window-watch-client: tests/window_watch_client.c $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
+	$(CC) $(CFLAGS) -o $@ tests/window_watch_client.c `$(PKG_CONFIG) --libs x11`
 test-window-watch: all $(BUILD_DIR)/window-watch-client
 	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/window_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/window-watch-client; else $(TCLSH) tests/window_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/window-watch-client; fi
 $(BUILD_DIR)/desktop-watch-client: tests/desktop_watch_client.c $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
+	$(CC) $(CFLAGS) -o $@ tests/desktop_watch_client.c `$(PKG_CONFIG) --libs x11`
 test-desktop-watch: all $(BUILD_DIR)/desktop-watch-client
 	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/desktop_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/desktop-watch-client; else $(TCLSH) tests/desktop_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/desktop-watch-client; fi
 test-taskbar:
