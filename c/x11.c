@@ -985,7 +985,10 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     Tcl_CreateObjCommand(ip, "::x11::watch_monitors", WatchMonitorsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::unwatch_monitors", UnwatchMonitorsCmd, NULL, NULL);
     Tcl_CallWhenDeleted(ip, monitor_watch_deleted, NULL);
-    Tcl_CreateObjCommand(ip, "::x11::windows", WindowsCmd, NULL, NULL);\n    Tcl_CreateObjCommand(ip, "::x11::watch_windows", WatchWindowsCmd, NULL, NULL);\n    Tcl_CreateObjCommand(ip, "::x11::unwatch_windows", UnwatchWindowsCmd, NULL, NULL);\n    Tcl_CallWhenDeleted(ip, window_watch_deleted, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::windows", WindowsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::watch_windows", WatchWindowsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::unwatch_windows", UnwatchWindowsCmd, NULL, NULL);
+    Tcl_CallWhenDeleted(ip, window_watch_deleted, NULL);
     Tcl_CreateObjCommand(ip, "::x11::activate", ActivateCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::desktops", DesktopsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::current_desktop", CurrentDesktopCmd, NULL, NULL);
