@@ -14,6 +14,8 @@ $(BUILD_DIR):
 	mkdir -p $@
 $(EXT): c/x11.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -fPIC -shared `$(PKG_CONFIG) --cflags $(TCL_PKGS)` -o $@ $< `$(PKG_CONFIG) --libs $(TCL_PKGS)`
+test-x11-load: all
+	$(TCLSH) tests/x11_load.tcl $(CURDIR)/$(EXT)
 run: all
 	TCLPANEL_LIB=$(CURDIR)/$(EXT) $(WISH) src/main.tcl
 test: all
