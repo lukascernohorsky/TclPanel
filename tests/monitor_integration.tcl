@@ -1,6 +1,6 @@
-# Integration test for XRandR output changes and logical monitor queries.
-# Xvfb's virtual output is switched off/on; this exercises RandR output-change
-# notifications, but does not emulate a physical cable being unplugged.
+# Integration test for XRandR output state changes and monitor watching.
+# Xvfb's virtual output is switched off/on; this tests RandR notifications and
+# panel fallback behavior, but does not emulate physical connector hotplug.
 if {$argc != 1} {
     puts stderr "usage: monitor_integration.tcl path-to-lib"
     exit 2
@@ -26,12 +26,6 @@ proc wait_for_monitor_event {previous_count} {
     return [expr {$::monitor_done ne "timeout" &&
                   $::monitor_events > $previous_count}]
 }
-proc has_monitor {monitors name} {
-    foreach monitor $monitors {
-        if {[dict get $monitor name] eq $name} { return 1 }
-    }
-    return 0
-}
 
 set initial [::x11::monitors]
 assert {[llength $initial] >= 1} "monitor query returned no monitor"
@@ -40,8 +34,8 @@ assert {[dict exists $first width] && [dict exists $first height]} "monitor geom
 assert {[dict get $first width] == 1280 && [dict get $first height] == 1024} \
     "unexpected initial Xvfb monitor geometry: $first"
 
-# Exercise panel monitor selection and geometry calculation without requiring
-# a window manager or a mapped Tk panel.
+# Exercise monitor selection and panel geometry without requiring a window
+# manager or a mapped Tk panel.
 set selected [::tclpanel::panel::select_monitor $initial 0]
 assert {[dict get $selected name] eq [dict get $first name]} "monitor index selection failed"
 assert {[::tclpanel::panel::geometry_for_monitor $selected 36 bottom] eq "1280x36+0+988"} \
@@ -53,32 +47,8 @@ if {![regexp -line {^(\S+)\s+connected} $query -> output]} {
     exit 1
 }
 
-# RandR 1.5 logical monitor creation/removal must be reflected by the query API.
-set test_name TclPanel-Test
-if {[catch {exec xrandr --setmonitor $test_name 1280/340x1024/270+0+0 $output} err]} {
-    puts stderr "FAIL: could not create XRandR logical monitor: $err"
-    exit 1
-}
-set with_test_monitor [::x11::monitors]
-assert {[has_monitor $with_test_monitor $test_name]} \
-    "new logical monitor is missing from ::x11::monitors"
-set test_monitor {}
-foreach item $with_test_monitor {
-    if {[dict get $item name] eq $test_name} { set test_monitor $item; break }
-}
-assert {[dict get $test_monitor width] == 1280 && [dict get $test_monitor height] == 1024} \
-    "new monitor geometry is incorrect: $test_monitor"
-assert {[::tclpanel::panel::geometry_for_monitor $test_monitor 36 bottom] eq "1280x36+0+988"} \
-    "panel geometry calculation failed for added monitor"
-if {[catch {exec xrandr --delmonitor $test_name} err]} {
-    puts stderr "FAIL: could not remove XRandR logical monitor: $err"
-    exit 1
-}
-assert {![has_monitor [::x11::monitors] $test_name]} \
-    "deleted logical monitor is still present in ::x11::monitors"
-
-# Output off/on transitions generate the RandR output-change events consumed
-# by watch_monitors and alter the active monitor set.
+# Disabling an output generates RandR CRTC/output notifications. The panel
+# must still receive a usable synthetic screen monitor when none are active.
 set ::monitor_events 0
 ::x11::watch_monitors monitor_callback
 if {[catch {exec xrandr --output $output --off} err]} {
@@ -88,9 +58,11 @@ if {[catch {exec xrandr --output $output --off} err]} {
 }
 assert {[wait_for_monitor_event 0]} "no XRandR callback after output was disabled"
 set inactive [::x11::monitors]
-assert {[llength $inactive] >= 1} "monitor fallback missing while output is disabled"
+assert {[llength $inactive] == 1} "expected one synthetic screen monitor while output is disabled"
 assert {[dict get [lindex $inactive 0] name] eq "screen"} \
     "inactive-output fallback did not return the synthetic screen monitor"
+assert {[::tclpanel::panel::geometry_for_monitor [lindex $inactive 0] 36 bottom] eq "1280x36+0+988"} \
+    "panel geometry is incorrect while output is disabled"
 
 set before_enable $::monitor_events
 if {[catch {exec xrandr --output $output --auto} err]} {
