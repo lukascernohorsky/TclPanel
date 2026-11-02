@@ -8,7 +8,7 @@ CFLAGS ?= -O2 -Wall -Wextra
 BUILD_DIR = build
 EXT = $(BUILD_DIR)/libtclpanelx11.so
 TCL_PKGS ?= tcl tk x11 xrandr
-.PHONY: all clean run test test-tray test-window-watch test-desktop-watch test-taskbar test-workspace install
+.PHONY: all clean run test test-tray test-window-watch test-desktop-watch test-taskbar test-workspace test-x11-load install
 all: $(EXT)
 $(BUILD_DIR):
 	mkdir -p $@
@@ -16,10 +16,11 @@ $(EXT): c/x11.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -fPIC -shared `$(PKG_CONFIG) --cflags $(TCL_PKGS)` -o $@ $< `$(PKG_CONFIG) --libs $(TCL_PKGS)`
 run: all
 	TCLPANEL_LIB=$(CURDIR)/$(EXT) $(WISH) src/main.tcl
-test:
+test: all
 	$(TCLSH) tests/smoke.tcl
 	$(TCLSH) tests/xdg_apps.tcl
 	$(TCLSH) tests/modules.tcl
+	$(TCLSH) tests/x11_load.tcl $(CURDIR)/$(EXT)
 $(BUILD_DIR)/tray-test-client: tests/tray_client.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
 test-tray: all $(BUILD_DIR)/tray-test-client
