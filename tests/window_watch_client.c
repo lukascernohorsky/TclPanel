@@ -9,13 +9,14 @@ static void set_client_list(Display *dpy, Window root, Atom property, Window *wi
 int main(void) {
     Display *dpy = XOpenDisplay(NULL);
     Window root, win, list[1];
-    Atom clients, utf8, net_name;
+    Atom clients, utf8, net_name, active;
     char command[128];
     if (dpy == NULL) { fprintf(stderr, "cannot open display\n"); return 2; }
     root = DefaultRootWindow(dpy);
     clients = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
     utf8 = XInternAtom(dpy, "UTF8_STRING", False);
     net_name = XInternAtom(dpy, "_NET_WM_NAME", False);
+    active = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
     win = XCreateSimpleWindow(dpy, root, 10, 10, 160, 80, 0, 0, 0);
     XStoreName(dpy, win, "initial title");
     {
@@ -37,6 +38,10 @@ int main(void) {
             XUnmapWindow(dpy, win); XSync(dpy, False); puts("ok"); fflush(stdout);
         } else if (strcmp(command, "map") == 0) {
             XMapWindow(dpy, win); XSync(dpy, False); puts("ok"); fflush(stdout);
+        } else if (strcmp(command, "active") == 0) {
+            unsigned long id = (unsigned long)win;
+            XChangeProperty(dpy, root, active, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&id, 1);
+            XSync(dpy, False); puts("ok"); fflush(stdout);
         } else if (strcmp(command, "remove") == 0) {
             set_client_list(dpy, root, clients, NULL, 0); puts("ok"); fflush(stdout);
         } else if (strcmp(command, "destroy") == 0) {
