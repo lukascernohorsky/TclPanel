@@ -1151,12 +1151,3 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     return TCL_OK;
 }
 
-/*
- * Tcl's FreeBSD loader may perform its fallback lookup with a leading
- * underscore. Export that spelling explicitly as well.
- */
-#ifdef __FreeBSD__
-int _Tclpanelx11_Init(Tcl_Interp *ip) {
-    return Tclpanelx11_Init(ip);
-}
-#endif
