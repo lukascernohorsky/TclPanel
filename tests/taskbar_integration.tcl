@@ -31,6 +31,8 @@ assert {[winfo exists $terminal] && [winfo exists $editor]} "initial taskbar but
 assert {[$terminal cget -text] eq "Terminal"} "initial title was not set"
 assert {[$terminal cget -relief] eq "sunken"} "active window was not highlighted"
 assert {[$editor cget -relief] eq "flat"} "inactive window has active relief"
+::tclpanel::module::taskbar::activate 32
+assert {$::mock::activated == 32} "taskbar button activation did not call the X11 API"
 
 set ::mock::windows {{16 {Terminal Updated} 0} {32 Editor 1}}
 set ::mock::active 32
