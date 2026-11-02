@@ -25,6 +25,5 @@ jobs:
 
             pkg-config --modversion tcl86 tk86 x11 xrandr
             make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS"
-            pkg-config --cflags --libs tcl86 tk86 x11 xrandr
-            nm -a build/libtclpanelx11.so | grep -i tclpanel || true
+            nm -g build/libtclpanelx11.so | grep Tclpanelx11_Init
             make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test
