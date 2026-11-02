@@ -24,6 +24,10 @@ proc ::tclpanel::module::taskbar::create {parent} {
 proc ::tclpanel::module::taskbar::destroyed {w} {
     variable widget
     variable event_driven
+    variable buttons
+    variable titles
+    variable active_id
+    variable ordered_ids
     if {$w ne $widget} { return }
     if {$event_driven && [llength [info commands ::x11::unwatch_windows]]} {
         catch {::x11::unwatch_windows}
