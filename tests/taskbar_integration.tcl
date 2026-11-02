@@ -34,6 +34,27 @@ assert {[$editor cget -relief] eq "flat"} "inactive window has active relief"
 ::tclpanel::module::taskbar::activate 32
 assert {$::mock::activated == 32} "taskbar button activation did not call the X11 API"
 
+# Exercise the wmctrl path used when the X11 extension is unavailable.
+rename ::x11::activate ::mock::x11_activate
+rename ::auto_execok ::mock::real_auto_execok
+rename ::exec ::mock::real_exec
+proc ::auto_execok {name} {
+    if {$name eq "wmctrl"} { return "/mock/wmctrl" }
+    return [::mock::real_auto_execok $name]
+}
+proc ::exec {args} {
+    lappend ::mock::exec_calls $args
+    return ""
+}
+set ::mock::exec_calls {}
+::tclpanel::module::taskbar::activate 0x20
+assert {$::mock::exec_calls eq {{wmctrl -ia 0x20}}} "wmctrl activation fallback was not invoked"
+rename ::exec {}
+rename ::auto_execok {}
+rename ::mock::real_exec ::exec
+rename ::mock::real_auto_execok ::auto_execok
+rename ::mock::x11_activate ::x11::activate
+
 set ::mock::windows {{16 {Terminal Updated} 0} {32 Editor 1}}
 set ::mock::active 32
 ::tclpanel::module::taskbar::refresh .tasks
