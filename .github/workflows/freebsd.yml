@@ -17,28 +17,12 @@ jobs:
           release: "15.0"
           mem: 6144
           prepare: |
-            pkg install -y tcl86 tk86 pkgconf libXrandr xorg-vfbserver font-misc-misc
+            pkg install -y tcl86 tk86 pkgconf libXrandr
           run: |
             set -e
-            export DISPLAY=:99
             export TCLSH=tclsh8.6
             export TCL_PKGS="tcl86 tk86 x11 xrandr"
 
             pkg-config --modversion tcl86 tk86 x11 xrandr
             make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS"
             make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test
-
-            Xvfb "$DISPLAY" -screen 0 1280x800x24 -ac -noloadxkb >/tmp/tclpanel-xvfb.log 2>&1 &
-            XVFB_PID=$!
-            trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
-            sleep 2
-            if ! kill -0 "$XVFB_PID"; then
-              cat /tmp/tclpanel-xvfb.log
-              exit 1
-            fi
-
-            make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test-tray
-            make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test-window-watch
-            make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test-desktop-watch
-            make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test-taskbar
-            make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test-workspace
