@@ -159,13 +159,20 @@ static int send_root_message(Display *dpy, const char *name,
 static int ActiveWindowCmd(ClientData cd, Tcl_Interp *ip, int objc,
                             Tcl_Obj *const objv[]) {
     Display *dpy;
-    unsigned long active = 0;
+    Atom actual;
+    int format;
+    unsigned long count, after, active = 0;
+    unsigned char *data = NULL;
     (void)cd;
     if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
     dpy = open_display(ip);
     if (dpy == NULL) return TCL_ERROR;
-    (void)get_cardinal(dpy, DefaultRootWindow(dpy), "_NET_ACTIVE_WINDOW",
-                       &active);
+    if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
+            atom(dpy, "_NET_ACTIVE_WINDOW"), 0, 1, False, XA_WINDOW,
+            &actual, &format, &count, &after, &data) == Success &&
+        data != NULL && actual == XA_WINDOW && format == 32 && count == 1)
+        active = *(unsigned long *)data;
+    if (data != NULL) XFree(data);
     XCloseDisplay(dpy);
     Tcl_SetObjResult(ip, Tcl_NewWideIntObj((Tcl_WideInt)active));
     return TCL_OK;
