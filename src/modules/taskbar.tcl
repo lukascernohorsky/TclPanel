@@ -67,9 +67,14 @@ proc ::tclpanel::module::taskbar::refresh {w} {
         }
     } elseif {[auto_execok wmctrl] ne "" && ![catch {exec wmctrl -l} lines]} {
         foreach line [split $lines \n] {
-            if {[regexp {^(\S+)\s+\S+\s+\S+\s+(.+)$} $line -> id title]} {
+            if {[regexp {^(0x[0-9a-fA-F]+)\s+\S+\s+\S+\s+(.+)$} $line -> id title]} {
                 lappend entries [list $id $title 0]
             }
+        }
+        if {[auto_execok xprop] ne "" &&
+            ![catch {exec xprop -root _NET_ACTIVE_WINDOW} active_line] &&
+            [regexp {window id # (0x[0-9a-fA-F]+)} $active_line -> active_hex]} {
+            set new_active $active_hex
         }
     }
 
@@ -122,7 +127,10 @@ proc ::tclpanel::module::taskbar::refresh {w} {
 }
 
 proc ::tclpanel::module::taskbar::activate {id} {
-    catch {::x11::activate $id}
+    if {[llength [info commands ::x11::activate]]} {
+        if {![catch {::x11::activate $id}]} { return }
+    }
+    ::tclpanel::module::taskbar::activate_wmctrl $id
 }
 proc ::tclpanel::module::taskbar::activate_wmctrl {id} {
     if {[auto_execok wmctrl] ne ""} { catch {exec wmctrl -ia $id} }
