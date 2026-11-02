@@ -914,6 +914,90 @@ static int UnwatchWindowsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     return TCL_OK;
 }
 
+
+/* EWMH virtual-desktop watcher. */
+static Display *desktop_watch_display = NULL;
+static Tcl_Interp *desktop_watch_interp = NULL;
+static Tcl_Obj *desktop_watch_callback = NULL;
+static Atom desktop_watch_current = None;
+static Atom desktop_watch_count = None;
+static Atom desktop_watch_names = None;
+
+static void stop_desktop_watch(void) {
+    if (desktop_watch_display != NULL) {
+        Tcl_DeleteFileHandler(ConnectionNumber(desktop_watch_display));
+        XCloseDisplay(desktop_watch_display);
+        desktop_watch_display = NULL;
+    }
+    if (desktop_watch_callback != NULL) {
+        Tcl_DecrRefCount(desktop_watch_callback);
+        desktop_watch_callback = NULL;
+    }
+    desktop_watch_interp = NULL;
+}
+static void desktop_watch_deleted(ClientData cd, Tcl_Interp *ip) {
+    (void)cd;
+    if (desktop_watch_interp == ip) stop_desktop_watch();
+}
+static void desktop_watch_readable(ClientData cd, int mask) {
+    XEvent ev;
+    int changed = 0;
+    (void)cd; (void)mask;
+    if (desktop_watch_display == NULL) return;
+    while (XPending(desktop_watch_display)) {
+        XNextEvent(desktop_watch_display, &ev);
+        if (ev.type == PropertyNotify &&
+            ev.xproperty.window == DefaultRootWindow(desktop_watch_display) &&
+            (ev.xproperty.atom == desktop_watch_current ||
+             ev.xproperty.atom == desktop_watch_count ||
+             ev.xproperty.atom == desktop_watch_names))
+            changed = 1;
+    }
+    if (changed && desktop_watch_callback != NULL &&
+        desktop_watch_interp != NULL) {
+        Tcl_IncrRefCount(desktop_watch_callback);
+        if (Tcl_EvalObjEx(desktop_watch_interp, desktop_watch_callback,
+                          TCL_EVAL_GLOBAL) != TCL_OK)
+            Tcl_BackgroundException(desktop_watch_interp, TCL_ERROR);
+        Tcl_DecrRefCount(desktop_watch_callback);
+    }
+}
+static int WatchDesktopsCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                            Tcl_Obj *const objv[]) {
+    (void)cd;
+    if (objc != 2) {
+        Tcl_WrongNumArgs(ip, 1, objv, "callbackCommand");
+        return TCL_ERROR;
+    }
+    stop_desktop_watch();
+    desktop_watch_display = XOpenDisplay(NULL);
+    if (desktop_watch_display == NULL) {
+        Tcl_SetObjResult(ip, Tcl_NewStringObj(
+            "cannot open X display for desktop events", -1));
+        return TCL_ERROR;
+    }
+    desktop_watch_current = atom(desktop_watch_display, "_NET_CURRENT_DESKTOP");
+    desktop_watch_count = atom(desktop_watch_display, "_NET_NUMBER_OF_DESKTOPS");
+    desktop_watch_names = atom(desktop_watch_display, "_NET_DESKTOP_NAMES");
+    XSelectInput(desktop_watch_display,
+                 DefaultRootWindow(desktop_watch_display), PropertyChangeMask);
+    XFlush(desktop_watch_display);
+    desktop_watch_interp = ip;
+    desktop_watch_callback = objv[1];
+    Tcl_IncrRefCount(desktop_watch_callback);
+    Tcl_CreateFileHandler(ConnectionNumber(desktop_watch_display), TCL_READABLE,
+                          desktop_watch_readable, NULL);
+    Tcl_SetObjResult(ip, Tcl_NewBooleanObj(1));
+    return TCL_OK;
+}
+static int UnwatchDesktopsCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                              Tcl_Obj *const objv[]) {
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    if (desktop_watch_interp == ip) stop_desktop_watch();
+    return TCL_OK;
+}
+
 static int MonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
                        Tcl_Obj *const objv[]) {
     Display *dpy;
@@ -993,6 +1077,9 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     Tcl_CreateObjCommand(ip, "::x11::desktops", DesktopsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::current_desktop", CurrentDesktopCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::set_desktop", SetDesktopCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::watch_desktops", WatchDesktopsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::unwatch_desktops", UnwatchDesktopsCmd, NULL, NULL);
+    Tcl_CallWhenDeleted(ip, desktop_watch_deleted, NULL);
     Tcl_PkgProvide(ip, "tclpanelx11", "0.7");
     return TCL_OK;
 }
