@@ -225,6 +225,37 @@ static int CurrentDesktopCmd(ClientData cd, Tcl_Interp *ip, int objc,
     Tcl_SetObjResult(ip, Tcl_NewWideIntObj((Tcl_WideInt)current));
     return TCL_OK;
 }
+static int DesktopNamesCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                             Tcl_Obj *const objv[]) {
+    Display *dpy;
+    Atom actual, utf8;
+    int format;
+    unsigned long count, after, start = 0, i;
+    unsigned char *data = NULL;
+    Tcl_Obj *result = Tcl_NewListObj(0, NULL);
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    dpy = open_display(ip);
+    if (dpy == NULL) return TCL_ERROR;
+    utf8 = atom(dpy, "UTF8_STRING");
+    if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
+            atom(dpy, "_NET_DESKTOP_NAMES"), 0, 65536, False, utf8,
+            &actual, &format, &count, &after, &data) == Success &&
+        data != NULL && actual == utf8 && format == 8) {
+        for (i = 0; i <= count; i++) {
+            if (i == count || data[i] == '\\0') {
+                Tcl_ListObjAppendElement(ip, result,
+                    Tcl_NewStringObj((const char *)data + start,
+                                     (int)(i - start)));
+                start = i + 1;
+            }
+        }
+    }
+    if (data != NULL) XFree(data);
+    XCloseDisplay(dpy);
+    Tcl_SetObjResult(ip, result);
+    return TCL_OK;
+}
 static int SetDesktopCmd(ClientData cd, Tcl_Interp *ip, int objc,
                          Tcl_Obj *const objv[]) {
     Display *dpy;
@@ -1104,6 +1135,7 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     Tcl_CallWhenDeleted(ip, window_watch_deleted, NULL);
     Tcl_CreateObjCommand(ip, "::x11::activate", ActivateCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::desktops", DesktopsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::desktop_names", DesktopNamesCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::current_desktop", CurrentDesktopCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::set_desktop", SetDesktopCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::watch_desktops", WatchDesktopsCmd, NULL, NULL);
