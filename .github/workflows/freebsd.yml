@@ -32,7 +32,10 @@ jobs:
             XVFB_PID=$!
             trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
             sleep 2
-            kill -0 "$XVFB_PID"
+            if ! kill -0 "$XVFB_PID"; then
+              cat /tmp/tclpanel-xvfb.log
+              exit 1
+            fi
 
             make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test-tray
             make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test-window-watch
