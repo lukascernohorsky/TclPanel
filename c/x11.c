@@ -784,6 +784,136 @@ static int UnwatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     return TCL_OK;
 }
 
+
+/* EWMH window-list watcher. Root properties track membership; per-client
+ * events track title, state, desktop and mapping changes. */
+static Display *window_watch_display = NULL;
+static Tcl_Interp *window_watch_interp = NULL;
+static Tcl_Obj *window_watch_callback = NULL;
+static Atom window_watch_client_list = None;
+static Atom window_watch_client_stacking = None;
+static Atom window_watch_name = None;
+static Atom window_watch_utf8_name = None;
+static Atom window_watch_state = None;
+static Atom window_watch_desktop = None;
+
+static void stop_window_watch(void) {
+    if (window_watch_display != NULL) {
+        Tcl_DeleteFileHandler(ConnectionNumber(window_watch_display));
+        XCloseDisplay(window_watch_display);
+        window_watch_display = NULL;
+    }
+    if (window_watch_callback != NULL) {
+        Tcl_DecrRefCount(window_watch_callback);
+        window_watch_callback = NULL;
+    }
+    window_watch_interp = NULL;
+}
+static void window_watch_deleted(ClientData cd, Tcl_Interp *ip) {
+    (void)cd;
+    if (window_watch_interp == ip) stop_window_watch();
+}
+static void window_watch_notify(void) {
+    if (window_watch_callback == NULL || window_watch_interp == NULL) return;
+    Tcl_IncrRefCount(window_watch_callback);
+    if (Tcl_EvalObjEx(window_watch_interp, window_watch_callback,
+                      TCL_EVAL_GLOBAL) != TCL_OK)
+        Tcl_BackgroundException(window_watch_interp, TCL_ERROR);
+    Tcl_DecrRefCount(window_watch_callback);
+}
+static void window_watch_select_clients(void) {
+    Window root = DefaultRootWindow(window_watch_display);
+    Atom actual;
+    int format;
+    unsigned long count, after, i;
+    unsigned char *data = NULL;
+    XErrorHandler previous;
+    if (XGetWindowProperty(window_watch_display, root,
+            window_watch_client_list, 0, 65536, False, XA_WINDOW,
+            &actual, &format, &count, &after, &data) != Success ||
+        data == NULL || actual != XA_WINDOW || format != 32) {
+        if (data != NULL) XFree(data);
+        return;
+    }
+    XSync(window_watch_display, False);
+    trapped_x_error = 0;
+    previous = XSetErrorHandler(tray_validation_error_handler);
+    for (i = 0; i < count; i++)
+        XSelectInput(window_watch_display, ((Window *)data)[i],
+                     PropertyChangeMask | StructureNotifyMask);
+    XSync(window_watch_display, False);
+    XSetErrorHandler(previous);
+    XFree(data);
+}
+static void window_watch_readable(ClientData cd, int mask) {
+    XEvent ev;
+    Window root;
+    int changed = 0;
+    (void)cd; (void)mask;
+    if (window_watch_display == NULL) return;
+    root = DefaultRootWindow(window_watch_display);
+    while (XPending(window_watch_display)) {
+        XNextEvent(window_watch_display, &ev);
+        if (ev.type == PropertyNotify) {
+            if (ev.xproperty.window == root &&
+                (ev.xproperty.atom == window_watch_client_list ||
+                 ev.xproperty.atom == window_watch_client_stacking)) {
+                window_watch_select_clients();
+                changed = 1;
+            } else if (ev.xproperty.atom == window_watch_name ||
+                       ev.xproperty.atom == window_watch_utf8_name ||
+                       ev.xproperty.atom == window_watch_state ||
+                       ev.xproperty.atom == window_watch_desktop) {
+                changed = 1;
+            }
+        } else if (ev.type == MapNotify || ev.type == UnmapNotify ||
+                   ev.type == DestroyNotify) {
+            changed = 1;
+        }
+    }
+    if (changed) window_watch_notify();
+}
+static int WatchWindowsCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                           Tcl_Obj *const objv[]) {
+    (void)cd;
+    if (objc != 2) {
+        Tcl_WrongNumArgs(ip, 1, objv, "callbackCommand");
+        return TCL_ERROR;
+    }
+    stop_window_watch();
+    window_watch_display = XOpenDisplay(NULL);
+    if (window_watch_display == NULL) {
+        Tcl_SetObjResult(ip, Tcl_NewStringObj(
+            "cannot open X display for window events", -1));
+        return TCL_ERROR;
+    }
+    window_watch_interp = ip;
+    window_watch_callback = objv[1];
+    Tcl_IncrRefCount(window_watch_callback);
+    window_watch_client_list = atom(window_watch_display, "_NET_CLIENT_LIST");
+    window_watch_client_stacking = atom(window_watch_display,
+                                         "_NET_CLIENT_LIST_STACKING");
+    window_watch_name = atom(window_watch_display, "WM_NAME");
+    window_watch_utf8_name = atom(window_watch_display, "_NET_WM_NAME");
+    window_watch_state = atom(window_watch_display, "_NET_WM_STATE");
+    window_watch_desktop = atom(window_watch_display, "_NET_WM_DESKTOP");
+    XSelectInput(window_watch_display,
+                 DefaultRootWindow(window_watch_display), PropertyChangeMask);
+    window_watch_select_clients();
+    XFlush(window_watch_display);
+    Tcl_CreateFileHandler(ConnectionNumber(window_watch_display), TCL_READABLE,
+                          window_watch_readable, NULL);
+    Tcl_SetObjResult(ip, Tcl_NewBooleanObj(1));
+    return TCL_OK;
+}
+static int UnwatchWindowsCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                             Tcl_Obj *const objv[]) {
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    if (window_watch_interp == ip) stop_window_watch();
+    return TCL_OK;
+}
+
 static int MonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
                        Tcl_Obj *const objv[]) {
     Display *dpy;
@@ -855,7 +985,7 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     Tcl_CreateObjCommand(ip, "::x11::watch_monitors", WatchMonitorsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::unwatch_monitors", UnwatchMonitorsCmd, NULL, NULL);
     Tcl_CallWhenDeleted(ip, monitor_watch_deleted, NULL);
-    Tcl_CreateObjCommand(ip, "::x11::windows", WindowsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::windows", WindowsCmd, NULL, NULL);\n    Tcl_CreateObjCommand(ip, "::x11::watch_windows", WatchWindowsCmd, NULL, NULL);\n    Tcl_CreateObjCommand(ip, "::x11::unwatch_windows", UnwatchWindowsCmd, NULL, NULL);\n    Tcl_CallWhenDeleted(ip, window_watch_deleted, NULL);
     Tcl_CreateObjCommand(ip, "::x11::activate", ActivateCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::desktops", DesktopsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::current_desktop", CurrentDesktopCmd, NULL, NULL);
