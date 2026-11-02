@@ -156,6 +156,20 @@ static int send_root_message(Display *dpy, const char *name,
     return XSendEvent(dpy, root, False,
                       SubstructureRedirectMask | SubstructureNotifyMask, &ev);
 }
+static int ActiveWindowCmd(ClientData cd, Tcl_Interp *ip, int objc,
+                            Tcl_Obj *const objv[]) {
+    Display *dpy;
+    unsigned long active = 0;
+    (void)cd;
+    if (objc != 1) { Tcl_WrongNumArgs(ip, 1, objv, ""); return TCL_ERROR; }
+    dpy = open_display(ip);
+    if (dpy == NULL) return TCL_ERROR;
+    (void)get_cardinal(dpy, DefaultRootWindow(dpy), "_NET_ACTIVE_WINDOW",
+                       &active);
+    XCloseDisplay(dpy);
+    Tcl_SetObjResult(ip, Tcl_NewWideIntObj((Tcl_WideInt)active));
+    return TCL_OK;
+}
 static int ActivateCmd(ClientData cd, Tcl_Interp *ip, int objc,
                        Tcl_Obj *const objv[]) {
     Display *dpy;
@@ -798,6 +812,7 @@ static Atom window_watch_name = None;
 static Atom window_watch_utf8_name = None;
 static Atom window_watch_state = None;
 static Atom window_watch_desktop = None;
+static Atom window_watch_active = None;
 
 static void stop_window_watch(void) {
     if (window_watch_display != NULL) {
@@ -860,7 +875,8 @@ static void window_watch_readable(ClientData cd, int mask) {
         if (ev.type == PropertyNotify) {
             if (ev.xproperty.window == root &&
                 (ev.xproperty.atom == window_watch_client_list ||
-                 ev.xproperty.atom == window_watch_client_stacking)) {
+                 ev.xproperty.atom == window_watch_client_stacking ||
+                 ev.xproperty.atom == window_watch_active)) {
                 window_watch_select_clients();
                 changed = 1;
             } else if (ev.xproperty.atom == window_watch_name ||
@@ -900,6 +916,7 @@ static int WatchWindowsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     window_watch_utf8_name = atom(window_watch_display, "_NET_WM_NAME");
     window_watch_state = atom(window_watch_display, "_NET_WM_STATE");
     window_watch_desktop = atom(window_watch_display, "_NET_WM_DESKTOP");
+    window_watch_active = atom(window_watch_display, "_NET_ACTIVE_WINDOW");
     XSelectInput(window_watch_display,
                  DefaultRootWindow(window_watch_display), PropertyChangeMask);
     window_watch_select_clients();
@@ -1074,6 +1091,7 @@ int Tclpanelx11_Init(Tcl_Interp *ip) {
     Tcl_CreateObjCommand(ip, "::x11::unwatch_monitors", UnwatchMonitorsCmd, NULL, NULL);
     Tcl_CallWhenDeleted(ip, monitor_watch_deleted, NULL);
     Tcl_CreateObjCommand(ip, "::x11::windows", WindowsCmd, NULL, NULL);
+    Tcl_CreateObjCommand(ip, "::x11::active_window", ActiveWindowCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::watch_windows", WatchWindowsCmd, NULL, NULL);
     Tcl_CreateObjCommand(ip, "::x11::unwatch_windows", UnwatchWindowsCmd, NULL, NULL);
     Tcl_CallWhenDeleted(ip, window_watch_deleted, NULL);
