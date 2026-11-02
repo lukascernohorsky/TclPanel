@@ -12,7 +12,7 @@ TCL_PKGS ?= tcl tk x11 xrandr
 all: $(EXT)
 $(BUILD_DIR):
 	mkdir -p $@
-$(EXT): c/x11.c | $(BUILD_DIR)
+$(EXT): c/x11.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -fPIC -shared `$(PKG_CONFIG) --cflags $(TCL_PKGS)` -o $@ $< `$(PKG_CONFIG) --libs $(TCL_PKGS)`
 run: all
 	TCLPANEL_LIB=$(CURDIR)/$(EXT) $(WISH) src/main.tcl
@@ -20,15 +20,15 @@ test:
 	$(TCLSH) tests/smoke.tcl
 	$(TCLSH) tests/xdg_apps.tcl
 	$(TCLSH) tests/modules.tcl
-$(BUILD_DIR)/tray-test-client: tests/tray_client.c | $(BUILD_DIR)
+$(BUILD_DIR)/tray-test-client: tests/tray_client.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
 test-tray: all $(BUILD_DIR)/tray-test-client
 	xvfb-run -a $(TCLSH) tests/tray_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/tray-test-client
-$(BUILD_DIR)/window-watch-client: tests/window_watch_client.c | $(BUILD_DIR)
+$(BUILD_DIR)/window-watch-client: tests/window_watch_client.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
 test-window-watch: all $(BUILD_DIR)/window-watch-client
 	xvfb-run -a $(TCLSH) tests/window_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/window-watch-client
-$(BUILD_DIR)/desktop-watch-client: tests/desktop_watch_client.c | $(BUILD_DIR)
+$(BUILD_DIR)/desktop-watch-client: tests/desktop_watch_client.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
 test-desktop-watch: all $(BUILD_DIR)/desktop-watch-client
 	xvfb-run -a $(TCLSH) tests/desktop_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/desktop-watch-client
