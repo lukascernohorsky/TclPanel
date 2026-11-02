@@ -296,11 +296,12 @@ static Atom tray_xembed_info = None;
 static void tray_stop_internal(void);
 
 static void tray_notify(void) {
-    if (tray_callback == NULL || tray_interp == NULL) return;
-    Tcl_IncrRefCount(tray_callback);
-    if (Tcl_EvalObjEx(tray_interp, tray_callback, TCL_EVAL_GLOBAL) != TCL_OK)
+    Tcl_Obj *callback = tray_callback;
+    if (callback == NULL || tray_interp == NULL) return;
+    Tcl_IncrRefCount(callback);
+    if (Tcl_EvalObjEx(tray_interp, callback, TCL_EVAL_GLOBAL) != TCL_OK)
         Tcl_BackgroundException(tray_interp, TCL_ERROR);
-    Tcl_DecrRefCount(tray_callback);
+    Tcl_DecrRefCount(callback);
 }
 static int tray_icon_is_mapped(Window win) {
     Atom actual;
@@ -737,10 +738,11 @@ static void monitor_watch_readable(ClientData cd, int mask) {
         }
     }
     if (changed && monitor_watch_callback != NULL) {
-        Tcl_IncrRefCount(monitor_watch_callback);
-        if (Tcl_EvalObjEx(ip, monitor_watch_callback, TCL_EVAL_GLOBAL) != TCL_OK)
+        Tcl_Obj *callback = monitor_watch_callback;
+        Tcl_IncrRefCount(callback);
+        if (Tcl_EvalObjEx(ip, callback, TCL_EVAL_GLOBAL) != TCL_OK)
             Tcl_BackgroundException(ip, TCL_ERROR);
-        Tcl_DecrRefCount(monitor_watch_callback);
+        Tcl_DecrRefCount(callback);
     }
 }
 static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
@@ -814,12 +816,13 @@ static void window_watch_deleted(ClientData cd, Tcl_Interp *ip) {
     if (window_watch_interp == ip) stop_window_watch();
 }
 static void window_watch_notify(void) {
-    if (window_watch_callback == NULL || window_watch_interp == NULL) return;
-    Tcl_IncrRefCount(window_watch_callback);
-    if (Tcl_EvalObjEx(window_watch_interp, window_watch_callback,
-                      TCL_EVAL_GLOBAL) != TCL_OK)
-        Tcl_BackgroundException(window_watch_interp, TCL_ERROR);
-    Tcl_DecrRefCount(window_watch_callback);
+    Tcl_Obj *callback = window_watch_callback;
+    Tcl_Interp *ip = window_watch_interp;
+    if (callback == NULL || ip == NULL) return;
+    Tcl_IncrRefCount(callback);
+    if (Tcl_EvalObjEx(ip, callback, TCL_EVAL_GLOBAL) != TCL_OK)
+        Tcl_BackgroundException(ip, TCL_ERROR);
+    Tcl_DecrRefCount(callback);
 }
 static void window_watch_select_clients(void) {
     Window root = DefaultRootWindow(window_watch_display);
@@ -955,11 +958,12 @@ static void desktop_watch_readable(ClientData cd, int mask) {
     }
     if (changed && desktop_watch_callback != NULL &&
         desktop_watch_interp != NULL) {
-        Tcl_IncrRefCount(desktop_watch_callback);
-        if (Tcl_EvalObjEx(desktop_watch_interp, desktop_watch_callback,
-                          TCL_EVAL_GLOBAL) != TCL_OK)
-            Tcl_BackgroundException(desktop_watch_interp, TCL_ERROR);
-        Tcl_DecrRefCount(desktop_watch_callback);
+        Tcl_Obj *callback = desktop_watch_callback;
+        Tcl_Interp *ip = desktop_watch_interp;
+        Tcl_IncrRefCount(callback);
+        if (Tcl_EvalObjEx(ip, callback, TCL_EVAL_GLOBAL) != TCL_OK)
+            Tcl_BackgroundException(ip, TCL_ERROR);
+        Tcl_DecrRefCount(callback);
     }
 }
 static int WatchDesktopsCmd(ClientData cd, Tcl_Interp *ip, int objc,
