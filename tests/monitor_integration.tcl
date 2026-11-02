@@ -1,6 +1,6 @@
-# Integration test for XRandR logical monitor changes.
-# Xvfb provides a virtual output; xrandr --setmonitor/--delmonitor exercise
-# monitor creation/removal notifications, not physical connector hotplug.
+# Integration test for XRandR output changes and logical monitor queries.
+# Xvfb's virtual output is switched off/on; this exercises RandR output-change
+# notifications, but does not emulate a physical cable being unplugged.
 if {$argc != 1} {
     puts stderr "usage: monitor_integration.tcl path-to-lib"
     exit 2
@@ -52,16 +52,13 @@ if {![regexp -line {^(\S+)\s+connected} $query -> output]} {
     puts stderr "FAIL: Xvfb did not expose a connected RandR output"
     exit 1
 }
-set test_name TclPanel-Test
-set ::monitor_events 0
-::x11::watch_monitors monitor_callback
 
+# RandR 1.5 logical monitor creation/removal must be reflected by the query API.
+set test_name TclPanel-Test
 if {[catch {exec xrandr --setmonitor $test_name 1280/340x1024/270+0+0 $output} err]} {
-    ::x11::unwatch_monitors
     puts stderr "FAIL: could not create XRandR logical monitor: $err"
     exit 1
 }
-assert {[wait_for_monitor_event 0]} "no XRandR callback after monitor creation"
 set with_test_monitor [::x11::monitors]
 assert {[has_monitor $with_test_monitor $test_name]} \
     "new logical monitor is missing from ::x11::monitors"
@@ -73,27 +70,46 @@ assert {[dict get $test_monitor width] == 1280 && [dict get $test_monitor height
     "new monitor geometry is incorrect: $test_monitor"
 assert {[::tclpanel::panel::geometry_for_monitor $test_monitor 36 bottom] eq "1280x36+0+988"} \
     "panel geometry calculation failed for added monitor"
-
-set before_remove $::monitor_events
 if {[catch {exec xrandr --delmonitor $test_name} err]} {
-    ::x11::unwatch_monitors
     puts stderr "FAIL: could not remove XRandR logical monitor: $err"
     exit 1
 }
-assert {[wait_for_monitor_event $before_remove]} "no XRandR callback after monitor removal"
-set after_remove [::x11::monitors]
-assert {![has_monitor $after_remove $test_name]} \
+assert {![has_monitor [::x11::monitors] $test_name]} \
     "deleted logical monitor is still present in ::x11::monitors"
+
+# Output off/on transitions generate the RandR output-change events consumed
+# by watch_monitors and alter the active monitor set.
+set ::monitor_events 0
+::x11::watch_monitors monitor_callback
+if {[catch {exec xrandr --output $output --off} err]} {
+    ::x11::unwatch_monitors
+    puts stderr "FAIL: could not disable Xvfb RandR output: $err"
+    exit 1
+}
+assert {[wait_for_monitor_event 0]} "no XRandR callback after output was disabled"
+set inactive [::x11::monitors]
+assert {[llength $inactive] >= 1} "monitor fallback missing while output is disabled"
+assert {[dict get [lindex $inactive 0] name] eq "screen"} \
+    "inactive-output fallback did not return the synthetic screen monitor"
+
+set before_enable $::monitor_events
+if {[catch {exec xrandr --output $output --auto} err]} {
+    ::x11::unwatch_monitors
+    puts stderr "FAIL: could not re-enable Xvfb RandR output: $err"
+    exit 1
+}
+assert {[wait_for_monitor_event $before_enable]} "no XRandR callback after output was re-enabled"
+assert {[llength [::x11::monitors]] >= 1} "monitor query returned no monitor after output re-enable"
 
 ::x11::unwatch_monitors
 set events_after_unwatch $::monitor_events
-if {[catch {exec xrandr --setmonitor $test_name 1280/340x1024/270+0+0 $output} err]} {
-    puts stderr "FAIL: second monitor creation failed: $err"
+if {[catch {exec xrandr --output $output --off} err]} {
+    puts stderr "FAIL: could not disable output after unwatch: $err"
     exit 1
 }
 after 300 {set ::settle 1}
 vwait ::settle
 assert {$::monitor_events == $events_after_unwatch} "callback fired after unwatch_monitors"
-catch {exec xrandr --delmonitor $test_name}
+catch {exec xrandr --output $output --auto}
 
-puts "PASS: XRandR monitor query, add/remove notifications, panel geometry and watcher cleanup"
+puts "PASS: XRandR monitor query, output-change notifications, panel geometry and watcher cleanup"
