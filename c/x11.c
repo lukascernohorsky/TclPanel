@@ -1116,6 +1116,8 @@ static int MonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
 
 #ifdef _WIN32
 __declspec(dllexport)
+#elif defined(__GNUC__)
+__attribute__((visibility("default")))
 #endif
 int Tclpanelx11_Init(Tcl_Interp *ip) {
     if (Tcl_InitStubs(ip, "8.6", 0) == NULL) return TCL_ERROR;
