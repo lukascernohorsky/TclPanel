@@ -214,6 +214,21 @@ int main(void) {
             XSync(dpy, False);
             printf("%lu\n", (unsigned long)parent);
             fflush(stdout);
+        } else if (strcmp(command, "selection-owner") == 0) {
+            char selection_name[64];
+            Atom selection;
+            snprintf(selection_name, sizeof(selection_name), "_NET_SYSTEM_TRAY_S%d", DefaultScreen(dpy));
+            selection = XInternAtom(dpy, selection_name, False);
+            printf("%lu\n", (unsigned long)XGetSelectionOwner(dpy, selection));
+            fflush(stdout);
+        } else if (strcmp(command, "icon-parent") == 0 && icon != None) {
+            Window root, parent_window, *children = NULL;
+            unsigned int nchildren = 0;
+            if (!XQueryTree(dpy, icon, &root, &parent_window, &children, &nchildren))
+                return 4;
+            if (children != NULL) XFree(children);
+            printf("%lu %lu\n", (unsigned long)parent_window, (unsigned long)root);
+            fflush(stdout);
         } else if (strcmp(command, "steal") == 0) {
             char selection_name[64];
             Atom selection;

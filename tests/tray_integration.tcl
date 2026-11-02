@@ -226,6 +226,52 @@ try {
     set trayWindow [::x11::tray_start $parentId 48 24 tray_changed]
     set trayStarted 1
     if {![::x11::tray_active]} { error "tray did not restart with replacement parent" }
+    # Deleting a Tcl interpreter must release the tray selection and
+    # detach client icons from the manager-owned tray window.
+    set shutdownScript [file join [file dirname [info script]] tray_shutdown.tcl]
+    set helper [open |[list [info nameofexecutable] $shutdownScript $extension $parentId] r+]
+    fconfigure $helper -buffering line
+    if {[gets $helper shutdownTrayWindow] < 0} {
+        error "shutdown helper did not start a tray manager"
+    }
+    puts $channel "dock $shutdownTrayWindow"
+    flush $channel
+    if {[gets $channel shutdownIconId] < 0} {
+        error "test client failed to create icon for interpreter shutdown"
+    }
+    set embeddedParent {}
+    for {set i 0} {$i < 80} {incr i} {
+        puts $channel icon-parent
+        flush $channel
+        if {[gets $channel embeddedParent] < 0} {
+            error "test client could not query shutdown-test icon parent"
+        }
+        if {[lindex $embeddedParent 0] == $shutdownTrayWindow} {
+            break
+        }
+        after 25
+        update
+    }
+    if {[lindex $embeddedParent 0] != $shutdownTrayWindow} {
+        error "shutdown test icon was not reparented into helper tray"
+    }
+    puts $helper exit
+    flush $helper
+    if {[catch {close $helper} helperError]} {
+        error "shutdown helper exited with an error: $helperError"
+    }
+    puts $channel selection-owner
+    flush $channel
+    if {[gets $channel selectionOwner] < 0 || $selectionOwner != 0} {
+        error "tray selection was not released when Tcl interpreter exited"
+    }
+    puts $channel icon-parent
+    flush $channel
+    if {[gets $channel detachedParent] < 0 ||
+        [lindex $detachedParent 0] != [lindex $detachedParent 1]} {
+        error "tray icon was not reparented to the root window on interpreter exit"
+    }
+
     puts "XEmbed integration test passed"
 } finally {
     if {$trayStarted} { catch {::x11::tray_stop} }
