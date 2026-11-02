@@ -19,3 +19,5 @@ jobs:
         run: make test-tray
       - name: Run X11 window watcher integration test
         run: make test-window-watch
+      - name: Run virtual desktop watcher integration test
+        run: make test-desktop-watch
