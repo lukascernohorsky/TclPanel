@@ -32,7 +32,7 @@ assert {[$terminal cget -text] eq "Terminal"} "initial title was not set"
 assert {[$terminal cget -relief] eq "sunken"} "active window was not highlighted"
 assert {[$editor cget -relief] eq "flat"} "inactive window has active relief"
 
-set ::mock::windows {{16 Terminal Updated 0} {32 Editor 1}}
+set ::mock::windows {{16 {Terminal Updated} 0} {32 Editor 1}}
 set ::mock::active 32
 ::tclpanel::module::taskbar::refresh .tasks
 assert {[button_for 16] eq $terminal} "existing taskbar button was recreated"
