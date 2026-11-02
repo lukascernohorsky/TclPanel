@@ -28,7 +28,7 @@ jobs:
             make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS"
             make TCLSH="$TCLSH" TCL_PKGS="$TCL_PKGS" test
 
-            Xvfb "$DISPLAY" -screen 0 1280x800x24 -ac -kb >/tmp/tclpanel-xvfb.log 2>&1 &
+            Xvfb "$DISPLAY" -screen 0 1280x800x24 -ac -noloadxkb >/tmp/tclpanel-xvfb.log 2>&1 &
             XVFB_PID=$!
             trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
             sleep 2
