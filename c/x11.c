@@ -824,7 +824,8 @@ static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     }
     XRRSelectInput(monitor_watch_display, DefaultRootWindow(monitor_watch_display),
                    RRScreenChangeNotifyMask | RRCrtcChangeNotifyMask |
-                   RROutputChangeNotifyMask | RROutputPropertyNotifyMask);
+                   RROutputChangeNotifyMask | RROutputPropertyNotifyMask |
+                   RRResourceChangeNotifyMask);
     XFlush(monitor_watch_display);
     monitor_watch_interp = ip;
     monitor_watch_callback = objv[1];
