@@ -17,3 +17,5 @@ jobs:
         run: make test
       - name: Run XEmbed integration test
         run: make test-tray
+      - name: Run X11 window watcher integration test
+        run: make test-window-watch
