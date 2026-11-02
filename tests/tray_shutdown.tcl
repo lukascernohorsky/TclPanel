@@ -6,7 +6,7 @@ set parent [lindex $argv 1]
 load $extension Tclpanelx11
 proc shutdown_on_input {} {
     if {[gets stdin command] < 0 || $command eq "exit"} {
-        exit
+        set ::wait_for_shutdown 1
     }
 }
 set trayWindow [::x11::tray_start $parent 48 24 { }]
