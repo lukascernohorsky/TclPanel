@@ -243,7 +243,7 @@ static int DesktopNamesCmd(ClientData cd, Tcl_Interp *ip, int objc,
             &actual, &format, &count, &after, &data) == Success &&
         data != NULL && actual == utf8 && format == 8) {
         for (i = 0; i < count; i++) {
-            if (data[i] == '\\0') {
+            if (data[i] == '\0') {
                 Tcl_ListObjAppendElement(ip, result,
                     Tcl_NewStringObj((const char *)data + start,
                                      (int)(i - start)));
