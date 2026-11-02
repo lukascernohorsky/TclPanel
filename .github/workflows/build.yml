@@ -23,3 +23,5 @@ jobs:
         run: make test-desktop-watch
       - name: Run taskbar integration test
         run: make test-taskbar
+      - name: Run workspace integration test
+        run: make test-workspace
