@@ -1,6 +1,6 @@
-# Integration test for XRandR output state changes and monitor watching.
-# Xvfb's virtual output is switched off/on; this tests RandR notifications and
-# panel fallback behavior, but does not emulate physical connector hotplug.
+# Integration test for XRandR screen-size changes and monitor watching.
+# Xvfb's virtual framebuffer is resized; this exercises RandR screen-change
+# notifications, but does not emulate physical connector hotplug.
 if {$argc != 1} {
     puts stderr "usage: monitor_integration.tcl path-to-lib"
     exit 2
@@ -26,6 +26,13 @@ proc wait_for_monitor_event {previous_count} {
     return [expr {$::monitor_done ne "timeout" &&
                   $::monitor_events > $previous_count}]
 }
+proc screen_size {} {
+    set query [exec xrandr --query]
+    if {![regexp {current (\d+) x (\d+)} $query -> width height]} {
+        error "cannot parse current XRandR screen size"
+    }
+    return [list $width $height]
+}
 
 set initial [::x11::monitors]
 assert {[llength $initial] >= 1} "monitor query returned no monitor"
@@ -33,6 +40,7 @@ set first [lindex $initial 0]
 assert {[dict exists $first width] && [dict exists $first height]} "monitor geometry fields missing"
 assert {[dict get $first width] == 1280 && [dict get $first height] == 1024} \
     "unexpected initial Xvfb monitor geometry: $first"
+assert {[screen_size] eq {1280 1024}} "unexpected initial XRandR screen size"
 
 # Exercise monitor selection and panel geometry without requiring a window
 # manager or a mapped Tk panel.
@@ -41,47 +49,35 @@ assert {[dict get $selected name] eq [dict get $first name]} "monitor index sele
 assert {[::tclpanel::panel::geometry_for_monitor $selected 36 bottom] eq "1280x36+0+988"} \
     "bottom panel geometry is incorrect"
 
-set query [exec xrandr --query]
-if {![regexp -line {^(\S+)\s+connected} $query -> output]} {
-    puts stderr "FAIL: Xvfb did not expose a connected RandR output"
-    exit 1
-}
-
-# Disabling an output generates RandR CRTC/output notifications. The panel
-# must still receive a usable synthetic screen monitor when none are active.
 set ::monitor_events 0
 ::x11::watch_monitors monitor_callback
-if {[catch {exec xrandr --output $output --off} err]} {
+if {[catch {exec xrandr --fb 1600x1200} err]} {
     ::x11::unwatch_monitors
-    puts stderr "FAIL: could not disable Xvfb RandR output: $err"
+    puts stderr "FAIL: could not enlarge Xvfb framebuffer: $err"
     exit 1
 }
-assert {[wait_for_monitor_event 0]} "no XRandR callback after output was disabled"
-set inactive [::x11::monitors]
-assert {[llength $inactive] == 1} "expected one synthetic screen monitor while output is disabled"
-assert {[dict get [lindex $inactive 0] name] eq "screen"} \
-    "inactive-output fallback did not return the synthetic screen monitor"
-assert {[::tclpanel::panel::geometry_for_monitor [lindex $inactive 0] 36 bottom] eq "1280x36+0+988"} \
-    "panel geometry is incorrect while output is disabled"
+assert {[wait_for_monitor_event 0]} "no XRandR callback after framebuffer enlargement"
+assert {[screen_size] eq {1600 1200}} "XRandR screen size did not change after enlargement"
+assert {[llength [::x11::monitors]] >= 1} "monitor query returned no monitor after screen change"
 
-set before_enable $::monitor_events
-if {[catch {exec xrandr --output $output --auto} err]} {
+set before_restore $::monitor_events
+if {[catch {exec xrandr --fb 1280x1024} err]} {
     ::x11::unwatch_monitors
-    puts stderr "FAIL: could not re-enable Xvfb RandR output: $err"
+    puts stderr "FAIL: could not restore Xvfb framebuffer: $err"
     exit 1
 }
-assert {[wait_for_monitor_event $before_enable]} "no XRandR callback after output was re-enabled"
-assert {[llength [::x11::monitors]] >= 1} "monitor query returned no monitor after output re-enable"
+assert {[wait_for_monitor_event $before_restore]} "no XRandR callback after framebuffer restore"
+assert {[screen_size] eq {1280 1024}} "XRandR screen size was not restored"
 
 ::x11::unwatch_monitors
 set events_after_unwatch $::monitor_events
-if {[catch {exec xrandr --output $output --off} err]} {
-    puts stderr "FAIL: could not disable output after unwatch: $err"
+if {[catch {exec xrandr --fb 1600x1200} err]} {
+    puts stderr "FAIL: framebuffer resize after unwatch failed: $err"
     exit 1
 }
 after 300 {set ::settle 1}
 vwait ::settle
 assert {$::monitor_events == $events_after_unwatch} "callback fired after unwatch_monitors"
-catch {exec xrandr --output $output --auto}
+catch {exec xrandr --fb 1280x1024}
 
-puts "PASS: XRandR monitor query, output-change notifications, panel geometry and watcher cleanup"
+puts "PASS: XRandR screen-change notifications, monitor query, panel geometry and watcher cleanup"
