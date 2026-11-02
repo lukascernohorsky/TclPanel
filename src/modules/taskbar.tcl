@@ -1,6 +1,9 @@
 namespace eval ::tclpanel::module::taskbar {
     variable widget {}
     variable event_driven 0
+    variable buttons {}
+    variable titles {}
+    variable active_id 0
 }
 
 proc ::tclpanel::module::taskbar::create {parent} {
@@ -27,6 +30,9 @@ proc ::tclpanel::module::taskbar::destroyed {w} {
     }
     set widget {}
     set event_driven 0
+    set buttons {}
+    set titles {}
+    set active_id 0
 }
 
 proc ::tclpanel::module::taskbar::window_changed {} {
@@ -38,32 +44,77 @@ proc ::tclpanel::module::taskbar::window_changed {} {
 
 proc ::tclpanel::module::taskbar::refresh {w} {
     variable event_driven
+    variable buttons
+    variable titles
+    variable active_id
     if {![winfo exists $w]} { return }
-    foreach child [winfo children $w] { destroy $child }
 
-    set n 0
+    set entries {}
+    set new_active 0
     if {[llength [info commands ::x11::windows]]} {
         if {![catch {::x11::windows} windows]} {
-            foreach entry $windows {
-                lassign $entry id title desktop
-                set button $w.b[incr n]
-                button $button -text $title \
-                    -command [list ::tclpanel::module::taskbar::activate $id] \
-                    -relief flat -takefocus 0
-                pack $button -side left -fill y
-            }
+            set entries $windows
+        }
+        if {[llength [info commands ::x11::active_window]]} {
+            catch {set new_active [::x11::active_window]}
         }
     } elseif {[auto_execok wmctrl] ne "" && ![catch {exec wmctrl -l} lines]} {
         foreach line [split $lines \n] {
             if {[regexp {^(\S+)\s+\S+\s+\S+\s+(.+)$} $line -> id title]} {
-                set button $w.b[incr n]
-                button $button -text $title \
-                    -command [list ::tclpanel::module::taskbar::activate_wmctrl $id] \
-                    -relief flat -takefocus 0
-                pack $button -side left -fill y
+                lappend entries [list $id $title 0]
+            }
+        }
+        if {[auto_execok wmctrl] ne "" && ![catch {exec wmctrl -lp} active_lines]} {
+            foreach line [split $active_lines \n] {
+                if {[regexp {^0x[0-9a-fA-F]+\s+\S+\s+(\S+)} $line -> pid] &&
+                    [regexp {^0x([0-9a-fA-F]+)\s+\*} [exec wmctrl -d] -> desktop]} {
+                    # wmctrl does not expose a portable active-window field;
+                    # retain the X11 active-window API as the authoritative path.
+                }
             }
         }
     }
+
+    set present {}
+    set order {}
+    foreach entry $entries {
+        lassign $entry id title desktop
+        dict set present $id 1
+        lappend order $id
+        if {![dict exists $buttons $id] || ![winfo exists [dict get $buttons $id]]} {
+            set button $w.window_[string map {":" "_" "." "_" "x" "x"} $id]
+            button $button -text $title -command [list ::tclpanel::module::taskbar::activate $id] \
+                -relief flat -takefocus 0
+            dict set buttons $id $button
+        } else {
+            set button [dict get $buttons $id]
+        }
+        if {![dict exists $titles $id] || [dict get $titles $id] ne $title} {
+            $button configure -text $title
+            dict set titles $id $title
+        }
+        set relief [expr {$id eq $new_active ? "sunken" : "flat"}]
+        if {$id eq $active_id || $id eq $new_active} {
+            $button configure -relief $relief
+        }
+    }
+
+    foreach id [dict keys $buttons] {
+        if {![dict exists $present $id]} {
+            set button [dict get $buttons $id]
+            if {[winfo exists $button]} { destroy $button }
+            dict unset buttons $id
+            if {[dict exists $titles $id]} { dict unset titles $id }
+        }
+    }
+
+    # Repack existing widgets in EWMH client-list order without recreating them.
+    foreach id $order {
+        set button [dict get $buttons $id]
+        pack forget $button
+        pack $button -side left -fill y
+    }
+    set active_id $new_active
     if {!$event_driven} {
         after 3000 [list ::tclpanel::module::taskbar::refresh $w]
     }
