@@ -8,7 +8,7 @@ CFLAGS ?= -O2 -Wall -Wextra
 BUILD_DIR = build
 EXT = $(BUILD_DIR)/libtclpanelx11.so
 TCL_PKGS ?= tcl tk x11 xrandr
-.PHONY: all clean run test test-tray test-window-watch test-desktop-watch test-taskbar test-workspace test-x11-load install
+.PHONY: all clean run test test-tray test-window-watch test-desktop-watch test-taskbar test-workspace test-monitors test-x11-load install
 all: $(EXT)
 $(BUILD_DIR):
 	mkdir -p $@
@@ -39,6 +39,8 @@ test-taskbar:
 	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/taskbar_integration.tcl; else $(TCLSH) tests/taskbar_integration.tcl; fi
 test-workspace:
 	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/workspace_integration.tcl; else $(TCLSH) tests/workspace_integration.tcl; fi
+test-monitors: all
+	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a -s "-screen 0 1280x1024x24" $(TCLSH) tests/monitor_integration.tcl $(CURDIR)/$(EXT); else $(TCLSH) tests/monitor_integration.tcl $(CURDIR)/$(EXT); fi
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin \
 		$(DESTDIR)$(PREFIX)/share/tclpanel/src/modules \
