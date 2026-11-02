@@ -21,3 +21,5 @@ jobs:
         run: make test-window-watch
       - name: Run virtual desktop watcher integration test
         run: make test-desktop-watch
+      - name: Run taskbar integration test
+        run: make test-taskbar
