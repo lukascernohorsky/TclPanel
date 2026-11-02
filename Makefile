@@ -9,7 +9,7 @@ EXT = $(BUILD_DIR)/libtclpanelx11.so
 TCL_PKGS ?= tcl tk x11 xrandr
 TCL_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(TCL_PKGS) 2>/dev/null)
 TCL_LIBS := $(shell $(PKG_CONFIG) --libs $(TCL_PKGS) 2>/dev/null)
-.PHONY: all clean run test test-tray install
+.PHONY: all clean run test test-tray test-window-watch install
 all: $(EXT)
 $(BUILD_DIR):
 	mkdir -p $@
@@ -25,6 +25,10 @@ $(BUILD_DIR)/tray-test-client: tests/tray_client.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $< $(shell $(PKG_CONFIG) --libs x11)
 test-tray: all $(BUILD_DIR)/tray-test-client
 	xvfb-run -a $(TCLSH) tests/tray_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/tray-test-client
+$(BUILD_DIR)/window-watch-client: tests/window_watch_client.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ $< $(shell $(PKG_CONFIG) --libs x11)
+test-window-watch: all $(BUILD_DIR)/window-watch-client
+	xvfb-run -a $(TCLSH) tests/window_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/window-watch-client
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin \
 		$(DESTDIR)$(PREFIX)/share/tclpanel/src/modules \
