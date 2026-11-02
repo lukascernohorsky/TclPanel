@@ -9,7 +9,7 @@ EXT = $(BUILD_DIR)/libtclpanelx11.so
 TCL_PKGS ?= tcl tk x11 xrandr
 TCL_CFLAGS := $(shell $(PKG_CONFIG) --cflags $(TCL_PKGS) 2>/dev/null)
 TCL_LIBS := $(shell $(PKG_CONFIG) --libs $(TCL_PKGS) 2>/dev/null)
-.PHONY: all clean run test test-tray test-window-watch test-desktop-watch test-taskbar install
+.PHONY: all clean run test test-tray test-window-watch test-desktop-watch test-taskbar test-workspace install
 all: $(EXT)
 $(BUILD_DIR):
 	mkdir -p $@
@@ -35,6 +35,8 @@ test-desktop-watch: all $(BUILD_DIR)/desktop-watch-client
 	xvfb-run -a $(TCLSH) tests/desktop_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/desktop-watch-client
 test-taskbar:
 	xvfb-run -a $(TCLSH) tests/taskbar_integration.tcl
+test-workspace:
+	xvfb-run -a $(TCLSH) tests/workspace_integration.tcl
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin \
 		$(DESTDIR)$(PREFIX)/share/tclpanel/src/modules \
