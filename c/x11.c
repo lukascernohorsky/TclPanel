@@ -822,10 +822,25 @@ static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
         Tcl_SetObjResult(ip, Tcl_NewStringObj("XRandR extension unavailable", -1));
         return TCL_ERROR;
     }
-    XRRSelectInput(monitor_watch_display, DefaultRootWindow(monitor_watch_display),
-                   RRScreenChangeNotifyMask | RRCrtcChangeNotifyMask |
-                   RROutputChangeNotifyMask | RROutputPropertyNotifyMask |
-                   RRResourceChangeNotifyMask);
+    {
+        int randr_major = 1, randr_minor = 2;
+        int event_mask = RRScreenChangeNotifyMask | RRCrtcChangeNotifyMask |
+                         RROutputChangeNotifyMask | RROutputPropertyNotifyMask |
+                         RRResourceChangeNotifyMask;
+        /*
+         * RandR 1.5 reports XRRSetMonitor/XRRDeleteMonitor changes through
+         * RRNotify_MonitorChange. Older servers do not know this event mask,
+         * so request it only when both the headers and server support it.
+         */
+#ifdef RRMonitorChangeNotifyMask
+        if (XRRQueryVersion(monitor_watch_display, &randr_major,
+                            &randr_minor) &&
+            (randr_major > 1 || (randr_major == 1 && randr_minor >= 5)))
+            event_mask |= RRMonitorChangeNotifyMask;
+#endif
+        XRRSelectInput(monitor_watch_display,
+                       DefaultRootWindow(monitor_watch_display), event_mask);
+    }
     XFlush(monitor_watch_display);
     monitor_watch_interp = ip;
     monitor_watch_callback = objv[1];
