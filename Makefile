@@ -23,19 +23,19 @@ test:
 $(BUILD_DIR)/tray-test-client: tests/tray_client.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
 test-tray: all $(BUILD_DIR)/tray-test-client
-	xvfb-run -a $(TCLSH) tests/tray_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/tray-test-client
+	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/tray_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/tray-test-client; else $(TCLSH) tests/tray_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/tray-test-client; fi
 $(BUILD_DIR)/window-watch-client: tests/window_watch_client.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
 test-window-watch: all $(BUILD_DIR)/window-watch-client
-	xvfb-run -a $(TCLSH) tests/window_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/window-watch-client
+	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/window_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/window-watch-client; else $(TCLSH) tests/window_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/window-watch-client; fi
 $(BUILD_DIR)/desktop-watch-client: tests/desktop_watch_client.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ $< `$(PKG_CONFIG) --libs x11`
 test-desktop-watch: all $(BUILD_DIR)/desktop-watch-client
-	xvfb-run -a $(TCLSH) tests/desktop_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/desktop-watch-client
+	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/desktop_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/desktop-watch-client; else $(TCLSH) tests/desktop_watch.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/desktop-watch-client; fi
 test-taskbar:
-	xvfb-run -a $(TCLSH) tests/taskbar_integration.tcl
+	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/taskbar_integration.tcl; else $(TCLSH) tests/taskbar_integration.tcl; fi
 test-workspace:
-	xvfb-run -a $(TCLSH) tests/workspace_integration.tcl
+	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/workspace_integration.tcl; else $(TCLSH) tests/workspace_integration.tcl; fi
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin \
 		$(DESTDIR)$(PREFIX)/share/tclpanel/src/modules \
