@@ -45,16 +45,25 @@ proc ::tclpanel::module::workspace::refresh {w} {
     if {![winfo exists $w]} { return }
     set current "?"
     set count 0
+    set names {}
     if {[llength [info commands ::x11::current_desktop]]} {
         catch {set current [::x11::current_desktop]}
         catch {set count [::x11::desktops]}
+        if {[llength [info commands ::x11::desktop_names]]} {
+            catch {set names [::x11::desktop_names]}
+        }
     } elseif {[auto_execok wmctrl] ne "" && ![catch {exec wmctrl -d} data]} {
         foreach line [split $data \n] {
             if {[regexp {^([0-9]+)\s+\*} $line -> n]} { set current $n }
         }
         set count [llength [split [string trim $data] \n]]
     }
-    $w.label configure -text "Desktop [expr {$current eq "?" ? "?" : $current + 1}]"
+    set label_text "Desktop [expr {$current eq "?" ? "?" : $current + 1}]"
+    if {$current ne "?" && $current >= 0 && $current < [llength $names] &&
+        [lindex $names $current] ne ""} {
+        set label_text "[expr {$current + 1}]: [lindex $names $current]"
+    }
+    $w.label configure -text $label_text
     if {$count > 0 && $current ne "?"} {
         $w.prev configure -state [expr {$current <= 0 ? "disabled" : "normal"}]
         $w.next configure -state [expr {$current >= $count - 1 ? "disabled" : "normal"}]
