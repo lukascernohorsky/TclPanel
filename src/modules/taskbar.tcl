@@ -4,6 +4,7 @@ namespace eval ::tclpanel::module::taskbar {
     variable buttons {}
     variable titles {}
     variable active_id 0
+    variable ordered_ids {}
 }
 
 proc ::tclpanel::module::taskbar::create {parent} {
@@ -37,6 +38,7 @@ proc ::tclpanel::module::taskbar::destroyed {w} {
     set buttons {}
     set titles {}
     set active_id 0
+    set ordered_ids {}
 }
 
 proc ::tclpanel::module::taskbar::window_changed {} {
@@ -51,6 +53,7 @@ proc ::tclpanel::module::taskbar::refresh {w} {
     variable buttons
     variable titles
     variable active_id
+    variable ordered_ids
     if {![winfo exists $w]} { return }
 
     set entries {}
@@ -66,15 +69,6 @@ proc ::tclpanel::module::taskbar::refresh {w} {
         foreach line [split $lines \n] {
             if {[regexp {^(\S+)\s+\S+\s+\S+\s+(.+)$} $line -> id title]} {
                 lappend entries [list $id $title 0]
-            }
-        }
-        if {[auto_execok wmctrl] ne "" && ![catch {exec wmctrl -lp} active_lines]} {
-            foreach line [split $active_lines \n] {
-                if {[regexp {^0x[0-9a-fA-F]+\s+\S+\s+(\S+)} $line -> pid] &&
-                    [regexp {^0x([0-9a-fA-F]+)\s+\*} [exec wmctrl -d] -> desktop]} {
-                    # wmctrl does not expose a portable active-window field;
-                    # retain the X11 active-window API as the authoritative path.
-                }
             }
         }
     }
@@ -112,11 +106,14 @@ proc ::tclpanel::module::taskbar::refresh {w} {
         }
     }
 
-    # Repack existing widgets in EWMH client-list order without recreating them.
-    foreach id $order {
-        set button [dict get $buttons $id]
-        pack forget $button
-        pack $button -side left -fill y
+    # Repack existing widgets only when EWMH ordering changes.
+    if {$order ne $ordered_ids} {
+        foreach id $order {
+            set button [dict get $buttons $id]
+            pack forget $button
+            pack $button -side left -fill y
+        }
+        set ordered_ids $order
     }
     set active_id $new_active
     if {!$event_driven} {
