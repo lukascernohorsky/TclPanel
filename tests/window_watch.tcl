@@ -30,6 +30,10 @@ try {
     assert {[lindex [lindex $initial 0] 0] == $windowId} "enumerated window ID did not match test client"
     ::x11::watch_windows windows_changed
     set watching 1
+    send_client $channel active
+    wait_for {$callbacks > 0} "_NET_ACTIVE_WINDOW change did not invoke watcher callback"
+    assert {[::x11::active_window] == $windowId} "active window getter returned the wrong window"
+    set callbacks 0
     send_client $channel "title changed title"
     wait_for {$callbacks > 0} "title property change did not invoke watcher callback"
     set found [::x11::windows]
