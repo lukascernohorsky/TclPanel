@@ -943,6 +943,7 @@ static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     monitor_watch_interp = ip;
     monitor_watch_callback = objv[1];
     Tcl_IncrRefCount(monitor_watch_callback);
+    XSync(monitor_watch_display, False);
     monitor_watch_snapshot = monitor_watch_read_snapshot(ip);
     Tcl_IncrRefCount(monitor_watch_snapshot);
     fprintf(stderr, "WATCHDBG start gen=%lu snapshot=%s\\n",
@@ -1197,6 +1198,7 @@ static int MonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     dpy = open_display(ip);
     if (dpy == NULL) return TCL_ERROR;
     root = DefaultRootWindow(dpy);
+    XSync(dpy, False);
     monitors = XRRGetMonitors(dpy, root, True, &count);
     result = Tcl_NewListObj(0, NULL);
     if (monitors != NULL && count > 0) {
