@@ -20,6 +20,11 @@ proc monitor_callback {} {
     set ::monitor_done 1
 }
 proc monitor_restart_callback {} {
+    # Ignore delayed notifications from earlier monitor changes. Restart only
+    # when the monitor introduced by this test is actually present.
+    if {[monitor_named [::x11::monitors] TclPanelRestartProbe] eq ""} {
+        return
+    }
     incr ::monitor_events
     # Restart from inside the timer-driven callback. The expired timer must
     # not overwrite the timer installed by this new watcher.
