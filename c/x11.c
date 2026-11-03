@@ -762,6 +762,7 @@ static Tcl_Interp *monitor_watch_interp = NULL;
 static Tcl_Obj *monitor_watch_callback = NULL;
 static Tcl_Obj *monitor_watch_snapshot = NULL;
 static unsigned long monitor_watch_generation = 0;
+static Tcl_TimerToken monitor_watch_notify_timer = NULL;
 static Tcl_TimerToken monitor_watch_timer = NULL;
 static int monitor_watch_event_base = 0;
 
@@ -820,9 +821,27 @@ static int monitor_watch_refresh_snapshot(Tcl_Interp *ip) {
 
 static void monitor_watch_timer_proc(ClientData cd);
 
+static void monitor_watch_notify_timer_proc(ClientData cd) {
+    Tcl_Interp *ip = (Tcl_Interp *)cd;
+    monitor_watch_notify_timer = NULL;
+    if (monitor_watch_display != NULL && monitor_watch_interp == ip)
+        monitor_watch_notify(ip);
+}
+
+static void monitor_watch_schedule_notify(Tcl_Interp *ip) {
+    if (monitor_watch_notify_timer == NULL &&
+        monitor_watch_display != NULL && monitor_watch_interp == ip)
+        monitor_watch_notify_timer = Tcl_CreateTimerHandler(
+            0, monitor_watch_notify_timer_proc, ip);
+}
+
 static void stop_monitor_watch(void) {
     /* Invalidate a timer callback that may currently be executing Tcl code. */
     monitor_watch_generation++;
+    if (monitor_watch_notify_timer != NULL) {
+        Tcl_DeleteTimerHandler(monitor_watch_notify_timer);
+        monitor_watch_notify_timer = NULL;
+    }
     if (monitor_watch_timer != NULL) {
         Tcl_DeleteTimerHandler(monitor_watch_timer);
         monitor_watch_timer = NULL;
@@ -853,10 +872,12 @@ static void monitor_watch_timer_proc(ClientData cd) {
     unsigned long generation = monitor_watch_generation;
     monitor_watch_timer = NULL;
     if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
-    if (monitor_watch_refresh_snapshot(ip)) monitor_watch_notify(ip);
+    if (monitor_watch_refresh_snapshot(ip))
+        monitor_watch_schedule_notify(ip);
     /*
-     * The callback can stop and restart the watcher. Do not let this expired
-     * timer schedule itself over the new watcher's timer.
+     * Notifications are dispatched on a separate Tcl timer, outside this
+     * polling callback. The generation check remains a guard against any
+     * future synchronous callback path that replaces the watcher.
      */
     if (monitor_watch_generation == generation &&
         monitor_watch_display != NULL && monitor_watch_interp == ip)
@@ -881,7 +902,7 @@ static void monitor_watch_readable(ClientData cd, int mask) {
     }
     if (changed) {
         (void)monitor_watch_refresh_snapshot(ip);
-        monitor_watch_notify(ip);
+        monitor_watch_schedule_notify(ip);
     }
 }
 
