@@ -19,6 +19,14 @@ proc monitor_callback {} {
     incr ::monitor_events
     set ::monitor_done 1
 }
+proc monitor_restart_callback {} {
+    incr ::monitor_events
+    # Restart from inside the timer-driven callback. The expired timer must
+    # not overwrite the timer installed by this new watcher.
+    ::x11::unwatch_monitors
+    ::x11::watch_monitors monitor_callback
+    set ::monitor_done 1
+}
 proc wait_for_monitor_event {previous_count} {
     set ::monitor_done 0
     set timeout_id [after 4000 {set ::monitor_done timeout}]
@@ -100,6 +108,28 @@ assert {[wait_for_monitor_event $before_remove]} "no XRandR callback after logic
 set without_logical [::x11::monitors]
 assert {[monitor_named $without_logical TclPanelTestRight] eq ""} \
     "removed logical monitor is still reported: $without_logical"
+
+# Exercise watcher replacement from inside a timer-driven callback.
+# Adding a logical monitor is detected by polling; the callback restarts the
+# watcher. A subsequent removal must be observed by the replacement watcher.
+set ::monitor_events 0
+::x11::watch_monitors monitor_restart_callback
+set before_restart_probe $::monitor_events
+if {[catch {exec xrandr --setmonitor TclPanelRestartProbe 1280/340x1024/270+0+0 screen} err]} {
+    ::x11::unwatch_monitors
+    puts stderr "FAIL: could not add restart-probe monitor: $err"
+    exit 1
+}
+assert {[wait_for_monitor_event $before_restart_probe]} \
+    "monitor callback did not run while replacing its watcher"
+set before_restart_remove $::monitor_events
+if {[catch {exec xrandr --delmonitor TclPanelRestartProbe} err]} {
+    ::x11::unwatch_monitors
+    puts stderr "FAIL: could not remove restart-probe monitor: $err"
+    exit 1
+}
+assert {[wait_for_monitor_event $before_restart_remove]} \
+    "replacement monitor watcher stopped polling after callback restart"
 
 ::x11::unwatch_monitors
 set events_after_unwatch $::monitor_events
