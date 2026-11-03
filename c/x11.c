@@ -799,9 +799,6 @@ static Tcl_Obj *monitor_watch_read_snapshot(Tcl_Interp *ip) {
 
 static void monitor_watch_notify(Tcl_Interp *ip) {
     Tcl_Obj *callback;
-    fprintf(stderr, "MONDBG notify display=%p interp=%p timer=%p gen=%lu\\n",
-            (void *)monitor_watch_display, (void *)monitor_watch_interp,
-            (void *)monitor_watch_timer, monitor_watch_generation);
     if (monitor_watch_callback == NULL || monitor_watch_interp != ip) return;
     callback = monitor_watch_callback;
     Tcl_IncrRefCount(callback);
@@ -840,9 +837,6 @@ static void monitor_watch_schedule_notify(Tcl_Interp *ip) {
 
 static void stop_monitor_watch(void) {
     /* Invalidate a timer callback that may currently be executing Tcl code. */
-    fprintf(stderr, "MONDBG stop display=%p timer=%p notify=%p gen=%lu\\n",
-            (void *)monitor_watch_display, (void *)monitor_watch_timer,
-            (void *)monitor_watch_notify_timer, monitor_watch_generation);
     monitor_watch_generation++;
     if (monitor_watch_notify_timer != NULL) {
         Tcl_DeleteTimerHandler(monitor_watch_notify_timer);
@@ -876,16 +870,10 @@ static void monitor_watch_deleted(ClientData cd, Tcl_Interp *ip) {
 static void monitor_watch_timer_proc(ClientData cd) {
     Tcl_Interp *ip = (Tcl_Interp *)cd;
     unsigned long generation = monitor_watch_generation;
-    int changed;
-    fprintf(stderr, "MONDBG poll enter display=%p interp=%p gen=%lu\\n",
-            (void *)monitor_watch_display, (void *)monitor_watch_interp,
-            generation);
     monitor_watch_timer = NULL;
     if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
-    changed = monitor_watch_refresh_snapshot(ip);
-    fprintf(stderr, "MONDBG poll changed=%d gen=%lu\\n", changed,
-            monitor_watch_generation);
-    if (changed) monitor_watch_schedule_notify(ip);
+    if (monitor_watch_refresh_snapshot(ip))
+        monitor_watch_schedule_notify(ip);
     /*
      * Notifications are dispatched on a separate Tcl timer, outside this
      * polling callback. The generation check remains a guard against any
@@ -895,8 +883,6 @@ static void monitor_watch_timer_proc(ClientData cd) {
         monitor_watch_display != NULL && monitor_watch_interp == ip)
         monitor_watch_timer = Tcl_CreateTimerHandler(500,
                                       monitor_watch_timer_proc, ip);
-    fprintf(stderr, "MONDBG poll scheduled timer=%p gen=%lu\\n",
-            (void *)monitor_watch_timer, monitor_watch_generation);
 }
 
 static void monitor_watch_readable(ClientData cd, int mask) {
