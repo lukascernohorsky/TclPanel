@@ -128,8 +128,10 @@ if {[catch {exec xrandr --delmonitor TclPanelRestartProbe} err]} {
     puts stderr "FAIL: could not remove restart-probe monitor: $err"
     exit 1
 }
-assert {[wait_for_monitor_event $before_restart_remove]} \
-    "replacement monitor watcher stopped polling after callback restart"
+set restart_probe_state [::x11::monitors]
+set restart_probe_waited [wait_for_monitor_event $before_restart_remove]
+assert {$restart_probe_waited} \
+    "replacement monitor watcher stopped polling after callback restart (events=$::monitor_events, before=$before_restart_remove, monitors=$restart_probe_state)"
 
 ::x11::unwatch_monitors
 set events_after_unwatch $::monitor_events
