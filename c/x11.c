@@ -872,8 +872,14 @@ static void monitor_watch_timer_proc(ClientData cd) {
     unsigned long generation = monitor_watch_generation;
     monitor_watch_timer = NULL;
     if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
-    if (monitor_watch_refresh_snapshot(ip))
-        monitor_watch_schedule_notify(ip);
+    {
+        int changed = monitor_watch_refresh_snapshot(ip);
+        fprintf(stderr, "WATCHDBG poll gen=%lu changed=%d snapshot=%s\\n",
+                generation, changed,
+                monitor_watch_snapshot != NULL ?
+                Tcl_GetString(monitor_watch_snapshot) : "(null)");
+        if (changed) monitor_watch_schedule_notify(ip);
+    }
     /*
      * Notifications are dispatched on a separate Tcl timer, outside this
      * polling callback. The generation check remains a guard against any
@@ -939,6 +945,8 @@ static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     Tcl_IncrRefCount(monitor_watch_callback);
     monitor_watch_snapshot = monitor_watch_read_snapshot(ip);
     Tcl_IncrRefCount(monitor_watch_snapshot);
+    fprintf(stderr, "WATCHDBG start gen=%lu snapshot=%s\\n",
+            monitor_watch_generation, Tcl_GetString(monitor_watch_snapshot));
     Tcl_CreateFileHandler(ConnectionNumber(monitor_watch_display), TCL_READABLE,
                           monitor_watch_readable, ip);
     /*
