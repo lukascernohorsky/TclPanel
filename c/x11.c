@@ -817,7 +817,7 @@ static int monitor_watch_refresh_snapshot(Tcl_Interp *ip) {
     return changed;
 }
 
-static void monitor_watch_timer(ClientData cd);
+static void monitor_watch_timer_proc(ClientData cd);
 
 static void stop_monitor_watch(void) {
     if (monitor_watch_timer != NULL) {
@@ -845,14 +845,14 @@ static void monitor_watch_deleted(ClientData cd, Tcl_Interp *ip) {
     if (monitor_watch_interp == ip) stop_monitor_watch();
 }
 
-static void monitor_watch_timer(ClientData cd) {
+static void monitor_watch_timer_proc(ClientData cd) {
     Tcl_Interp *ip = (Tcl_Interp *)cd;
     monitor_watch_timer = NULL;
     if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
     if (monitor_watch_refresh_snapshot(ip)) monitor_watch_notify(ip);
     if (monitor_watch_display != NULL && monitor_watch_interp == ip)
         monitor_watch_timer = Tcl_CreateTimerHandler(500,
-                                      monitor_watch_timer, ip);
+                                      monitor_watch_timer_proc, ip);
 }
 
 static void monitor_watch_readable(ClientData cd, int mask) {
@@ -916,7 +916,7 @@ static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
      * Poll the active logical-monitor topology so those changes are observable
      * even when the server emits no screen/CRTC/output notification.
      */
-    monitor_watch_timer = Tcl_CreateTimerHandler(500, monitor_watch_timer, ip);
+    monitor_watch_timer = Tcl_CreateTimerHandler(500, monitor_watch_timer_proc, ip);
     Tcl_SetObjResult(ip, Tcl_NewBooleanObj(1));
     return TCL_OK;
 }
