@@ -761,6 +761,7 @@ static Display *monitor_watch_display = NULL;
 static Tcl_Interp *monitor_watch_interp = NULL;
 static Tcl_Obj *monitor_watch_callback = NULL;
 static Tcl_Obj *monitor_watch_snapshot = NULL;
+static unsigned long monitor_watch_generation = 0;
 static Tcl_TimerToken monitor_watch_timer = NULL;
 static int monitor_watch_event_base = 0;
 
@@ -820,6 +821,8 @@ static int monitor_watch_refresh_snapshot(Tcl_Interp *ip) {
 static void monitor_watch_timer_proc(ClientData cd);
 
 static void stop_monitor_watch(void) {
+    /* Invalidate a timer callback that may currently be executing Tcl code. */
+    monitor_watch_generation++;
     if (monitor_watch_timer != NULL) {
         Tcl_DeleteTimerHandler(monitor_watch_timer);
         monitor_watch_timer = NULL;
@@ -847,10 +850,16 @@ static void monitor_watch_deleted(ClientData cd, Tcl_Interp *ip) {
 
 static void monitor_watch_timer_proc(ClientData cd) {
     Tcl_Interp *ip = (Tcl_Interp *)cd;
+    unsigned long generation = monitor_watch_generation;
     monitor_watch_timer = NULL;
     if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
     if (monitor_watch_refresh_snapshot(ip)) monitor_watch_notify(ip);
-    if (monitor_watch_display != NULL && monitor_watch_interp == ip)
+    /*
+     * The callback can stop and restart the watcher. Do not let this expired
+     * timer schedule itself over the new watcher's timer.
+     */
+    if (monitor_watch_generation == generation &&
+        monitor_watch_display != NULL && monitor_watch_interp == ip)
         monitor_watch_timer = Tcl_CreateTimerHandler(500,
                                       monitor_watch_timer_proc, ip);
 }
