@@ -122,6 +122,11 @@ if {[catch {exec xrandr --setmonitor TclPanelRestartProbe 1280/340x1024/270+0+0 
 }
 assert {[wait_for_monitor_event $before_restart_probe]} \
     "monitor callback did not run while replacing its watcher"
+# Let the callback's Tcl evaluation and any queued XRandR notifications fully
+# unwind before issuing the next topology change. The replacement watcher must
+# then detect a fresh change using its own polling timer.
+after 700 {set ::restart_settled 1}
+vwait ::restart_settled
 set before_restart_remove $::monitor_events
 if {[catch {exec xrandr --delmonitor TclPanelRestartProbe} err]} {
     ::x11::unwatch_monitors
