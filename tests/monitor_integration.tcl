@@ -127,7 +127,7 @@ assert {[monitor_named $without_logical TclPanelTestRight] eq ""} \
 set ::monitor_events 0
 ::x11::watch_monitors monitor_restart_callback
 set before_restart_probe $::monitor_events
-if {[catch {exec xrandr --setmonitor TclPanelRestartProbe 1280/340x1024/270+0+0 screen} err]} {
+if {[catch {exec xrandr --setmonitor TclPanelRestartProbe 1280/340x1024/270+0+0 none} err]} {
     ::x11::unwatch_monitors
     puts stderr "FAIL: could not add restart-probe monitor: $err"
     exit 1
