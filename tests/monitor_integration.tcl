@@ -133,6 +133,11 @@ assert {[wait_for_monitor_event $before_restart_probe]} \
 after 700 {set ::restart_settled 1}
 vwait ::restart_settled
 set before_restart_remove $::monitor_events
+# Capture the server-side state immediately before removal. This distinguishes
+# a watcher snapshot problem from an Xvfb/xrandr topology change that vanished
+# during the callback-driven connection replacement.
+set restart_probe_baseline [::x11::monitors]
+set restart_probe_xrandr [exec xrandr --listmonitors]
 if {[catch {exec xrandr --delmonitor TclPanelRestartProbe} err]} {
     ::x11::unwatch_monitors
     puts stderr "FAIL: could not remove restart-probe monitor: $err"
@@ -141,7 +146,7 @@ if {[catch {exec xrandr --delmonitor TclPanelRestartProbe} err]} {
 set restart_probe_state [::x11::monitors]
 set restart_probe_waited [wait_for_monitor_event $before_restart_remove]
 assert {$restart_probe_waited} \
-    "replacement monitor watcher stopped polling after callback restart (events=$::monitor_events, before=$before_restart_remove, monitors=$restart_probe_state)"
+    "replacement monitor watcher stopped polling after callback restart (events=$::monitor_events, before=$before_restart_remove, baseline=$restart_probe_baseline, xrandr=$restart_probe_xrandr, after=$restart_probe_state)"
 
 ::x11::unwatch_monitors
 set events_after_unwatch $::monitor_events
