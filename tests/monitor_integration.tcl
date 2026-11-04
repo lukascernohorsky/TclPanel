@@ -23,7 +23,8 @@ proc monitor_restart_callback {} {
     # Ignore delayed notifications from earlier monitor changes. Restart only
     # when the monitor introduced by this test is actually present.
     set before_query [::x11::monitors]
-    puts stderr "RESTARTDBG callback query=$before_query"
+    set before_unwatch_xrandr [exec xrandr --listmonitors]
+    puts stderr "RESTARTDBG callback query=$before_query xrandr=$before_unwatch_xrandr"
     if {[monitor_named $before_query TclPanelRestartProbe] eq ""} {
         return
     }
@@ -31,7 +32,9 @@ proc monitor_restart_callback {} {
     # Restart from inside the timer-driven callback. The expired timer must
     # not overwrite the timer installed by this new watcher.
     ::x11::unwatch_monitors
-    puts stderr "RESTARTDBG after-unwatch monitors=[::x11::monitors]"
+    set after_unwatch_query [::x11::monitors]
+    set after_unwatch_xrandr [exec xrandr --listmonitors]
+    puts stderr "RESTARTDBG after-unwatch monitors=$after_unwatch_query xrandr=$after_unwatch_xrandr"
     ::x11::watch_monitors monitor_callback
     puts stderr "RESTARTDBG after-watch monitors=[::x11::monitors]"
     set ::monitor_done 1
