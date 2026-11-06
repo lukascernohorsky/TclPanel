@@ -8,6 +8,7 @@ if {$argc != 2} {
 }
 load [lindex $argv 0] Tclpanelx11
 set randr_close_probe [lindex $argv 1]
+set ::env(TCLPANEL_RANDR_DEBUG) 1
 source [file join [file dirname [info script]] .. src panel.tcl]
 
 proc assert {condition message} {
