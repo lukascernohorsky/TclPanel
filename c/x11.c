@@ -835,6 +835,24 @@ static void monitor_watch_schedule_notify(Tcl_Interp *ip) {
             0, monitor_watch_notify_timer_proc, ip);
 }
 
+static void monitor_watch_debug_state(const char *stage, Display *observer) {
+    XRRMonitorInfo *monitors;
+    int count = 0, i;
+    if (observer == NULL) return;
+    monitors = XRRGetMonitors(observer, DefaultRootWindow(observer), True, &count);
+    fprintf(stderr, "WATCHDBG state=%s count=%d", stage, count);
+    for (i = 0; monitors != NULL && i < count; i++) {
+        char *name = XGetAtomName(observer, monitors[i].name);
+        fprintf(stderr, " {%s %d %d %d %d}", name != NULL ? name : "?",
+                monitors[i].x, monitors[i].y,
+                monitors[i].width, monitors[i].height);
+        if (name != NULL) XFree(name);
+    }
+    fprintf(stderr, "\\n");
+    if (monitors != NULL) XRRFreeMonitors(monitors);
+    XSync(observer, False);
+}
+
 static void stop_monitor_watch(void) {
     /* Invalidate a timer callback that may currently be executing Tcl code. */
     monitor_watch_generation++;
@@ -847,14 +865,21 @@ static void stop_monitor_watch(void) {
         monitor_watch_timer = NULL;
     }
     if (monitor_watch_display != NULL) {
+        Display *observer = getenv("TCLPANEL_RANDR_DEBUG") != NULL ?
+                            XOpenDisplay(NULL) : NULL;
         fprintf(stderr, "WATCHDBG stop gen=%lu snapshot=%s\\n",
                 monitor_watch_generation,
                 monitor_watch_snapshot != NULL ?
                 Tcl_GetString(monitor_watch_snapshot) : "(null)");
-        XSync(monitor_watch_display, False);
+        monitor_watch_debug_state("before-stop", observer);
         Tcl_DeleteFileHandler(ConnectionNumber(monitor_watch_display));
+        monitor_watch_debug_state("after-file-handler-delete", observer);
+        XSync(monitor_watch_display, False);
+        monitor_watch_debug_state("after-watcher-sync", observer);
         XCloseDisplay(monitor_watch_display);
         monitor_watch_display = NULL;
+        monitor_watch_debug_state("after-watcher-close", observer);
+        if (observer != NULL) XCloseDisplay(observer);
     }
     if (monitor_watch_callback != NULL) {
         Tcl_DecrRefCount(monitor_watch_callback);
