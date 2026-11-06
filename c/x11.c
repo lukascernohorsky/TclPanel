@@ -836,21 +836,26 @@ static void monitor_watch_schedule_notify(Tcl_Interp *ip) {
 }
 
 static void monitor_watch_debug_state(const char *stage, Display *observer) {
-    XRRMonitorInfo *monitors;
-    int count = 0, i;
+    int active, i;
     if (observer == NULL) return;
-    monitors = XRRGetMonitors(observer, DefaultRootWindow(observer), True, &count);
-    fprintf(stderr, "WATCHDBG state=%s count=%d", stage, count);
-    for (i = 0; monitors != NULL && i < count; i++) {
-        char *name = XGetAtomName(observer, monitors[i].name);
-        fprintf(stderr, " {%s %d %d %d %d}", name != NULL ? name : "?",
-                monitors[i].x, monitors[i].y,
-                monitors[i].width, monitors[i].height);
-        if (name != NULL) XFree(name);
+    for (active = 0; active <= 1; active++) {
+        XRRMonitorInfo *monitors;
+        int count = 0;
+        monitors = XRRGetMonitors(observer, DefaultRootWindow(observer),
+                                  active ? True : False, &count);
+        fprintf(stderr, "WATCHDBG state=%s active=%d count=%d",
+                stage, active, count);
+        for (i = 0; monitors != NULL && i < count; i++) {
+            char *name = XGetAtomName(observer, monitors[i].name);
+            fprintf(stderr, " {%s %d %d %d %d}", name != NULL ? name : "?",
+                    monitors[i].x, monitors[i].y,
+                    monitors[i].width, monitors[i].height);
+            if (name != NULL) XFree(name);
+        }
+        fprintf(stderr, "\\n");
+        if (monitors != NULL) XRRFreeMonitors(monitors);
+        XSync(observer, False);
     }
-    fprintf(stderr, "\\n");
-    if (monitors != NULL) XRRFreeMonitors(monitors);
-    XSync(observer, False);
 }
 
 static void stop_monitor_watch(void) {
