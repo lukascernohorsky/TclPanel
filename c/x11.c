@@ -884,7 +884,13 @@ static void stop_monitor_watch(void) {
         XCloseDisplay(monitor_watch_display);
         monitor_watch_display = NULL;
         monitor_watch_debug_state("after-watcher-close", observer);
-        if (observer != NULL) XCloseDisplay(observer);
+        if (observer != NULL) {
+            XCloseDisplay(observer);
+            observer = XOpenDisplay(NULL);
+            monitor_watch_debug_state("after-observer-close-new-connection",
+                                      observer);
+            if (observer != NULL) XCloseDisplay(observer);
+        }
     }
     if (monitor_watch_callback != NULL) {
         Tcl_DecrRefCount(monitor_watch_callback);
