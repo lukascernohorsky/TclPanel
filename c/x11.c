@@ -847,6 +847,11 @@ static void stop_monitor_watch(void) {
         monitor_watch_timer = NULL;
     }
     if (monitor_watch_display != NULL) {
+        fprintf(stderr, "WATCHDBG stop gen=%lu snapshot=%s\\n",
+                monitor_watch_generation,
+                monitor_watch_snapshot != NULL ?
+                Tcl_GetString(monitor_watch_snapshot) : "(null)");
+        XSync(monitor_watch_display, False);
         Tcl_DeleteFileHandler(ConnectionNumber(monitor_watch_display));
         XCloseDisplay(monitor_watch_display);
         monitor_watch_display = NULL;
@@ -899,6 +904,8 @@ static void monitor_watch_readable(ClientData cd, int mask) {
     if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
     while (XPending(monitor_watch_display)) {
         XNextEvent(monitor_watch_display, &ev);
+        fprintf(stderr, "WATCHDBG event type=%d base=%d\\n",
+                ev.type, monitor_watch_event_base);
         if (ev.type == monitor_watch_event_base + RRScreenChangeNotify) {
             XRRUpdateConfiguration(&ev);
             changed = 1;
