@@ -153,6 +153,20 @@ foreach mode {open select get select-get} {
     }
 }
 
+# Keep one RandR client connected while a second client creates a logical
+# monitor. Drain events and poll the topology before closing the first client.
+set live_probe TclPanelLiveProbe
+if {[catch {exec $randr_close_probe watch $live_probe} probe_error]} {
+    puts stderr "FAIL: live RandR connection probe failed: $probe_error"
+    exit 1
+}
+set live_listing [exec xrandr --listmonitors]
+if {[string first $live_probe $live_listing] < 0} {
+    puts stderr "FAIL: logical monitor vanished after live connection probe: $live_listing"
+    exit 1
+}
+exec xrandr --delmonitor $live_probe
+
 # Distinguish ordinary watcher shutdown after processing a monitor
 # change from shutdown initiated reentrantly by the callback.
 set ::monitor_events 0
