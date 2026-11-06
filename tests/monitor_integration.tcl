@@ -71,37 +71,6 @@ assert {[dict get $selected name] eq [dict get $first name]} "monitor index sele
 assert {[::tclpanel::panel::geometry_for_monitor $selected 36 bottom] eq "1280x36+0+988"} \
     "bottom panel geometry is incorrect"
 
-# Isolate which Xlib/RandR operation, if any, makes Xvfb discard a
-# client-defined logical monitor when its Display connection closes.
-foreach mode {open select get select-get} {
-    set probe_name "TclPanelCloseProbe_[string map {- _} $mode]"
-    if {[catch {
-        exec xrandr --setmonitor $probe_name 1280/340x1024/270+0+0 none
-    } err]} {
-        puts stderr "FAIL: could not create $probe_name: $err"
-        exit 1
-    }
-    set before_probe_listing [exec xrandr --listmonitors]
-    if {[string first $probe_name $before_probe_listing] < 0} {
-        puts stderr "FAIL: synthetic monitor $probe_name was not present before probe: $before_probe_listing"
-        exit 1
-    }
-    if {[catch {exec $randr_close_probe $mode} err]} {
-        catch {exec xrandr --delmonitor $probe_name}
-        puts stderr "FAIL: RandR close probe '$mode' failed: $err"
-        exit 1
-    }
-    set probe_listing [exec xrandr --listmonitors]
-    if {[string first $probe_name $probe_listing] < 0} {
-        puts stderr "FAIL: logical monitor disappeared after RandR close probe '$mode': $probe_listing"
-        exit 1
-    }
-    if {[catch {exec xrandr --delmonitor $probe_name} err]} {
-        puts stderr "FAIL: could not remove $probe_name after probe: $err"
-        exit 1
-    }
-}
-
 set ::monitor_events 0
 ::x11::watch_monitors monitor_callback
 
@@ -152,6 +121,37 @@ assert {[wait_for_monitor_event $before_remove]} "no XRandR callback after logic
 set without_logical [::x11::monitors]
 assert {[monitor_named $without_logical TclPanelTestRight] eq ""} \
     "removed logical monitor is still reported: $without_logical"
+
+# Isolate which Xlib/RandR operation, if any, makes Xvfb discard a
+# client-defined logical monitor when its Display connection closes.
+foreach mode {open select get select-get} {
+    set probe_name "TclPanelCloseProbe_[string map {- _} $mode]"
+    if {[catch {
+        exec xrandr --setmonitor $probe_name 1280/340x1024/270+0+0 none
+    } err]} {
+        puts stderr "FAIL: could not create $probe_name: $err"
+        exit 1
+    }
+    set before_probe_listing [exec xrandr --listmonitors]
+    if {[string first $probe_name $before_probe_listing] < 0} {
+        puts stderr "FAIL: synthetic monitor $probe_name was not present before probe: $before_probe_listing"
+        exit 1
+    }
+    if {[catch {exec $randr_close_probe $mode} err]} {
+        catch {exec xrandr --delmonitor $probe_name}
+        puts stderr "FAIL: RandR close probe '$mode' failed: $err"
+        exit 1
+    }
+    set probe_listing [exec xrandr --listmonitors]
+    if {[string first $probe_name $probe_listing] < 0} {
+        puts stderr "FAIL: logical monitor disappeared after RandR close probe '$mode': $probe_listing"
+        exit 1
+    }
+    if {[catch {exec xrandr --delmonitor $probe_name} err]} {
+        puts stderr "FAIL: could not remove $probe_name after probe: $err"
+        exit 1
+    }
+}
 
 # Exercise watcher replacement from inside a timer-driven callback.
 # Adding a logical monitor is detected by polling; the callback restarts the
