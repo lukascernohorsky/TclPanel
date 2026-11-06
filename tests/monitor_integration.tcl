@@ -2,11 +2,12 @@
 # Xvfb has fixed pixel dimensions in CI; changing physical dimensions exercises
 # RandR screen notifications, while --setmonitor exercises logical topology
 # changes. Neither operation simulates a physical connector hotplug.
-if {$argc != 1} {
-    puts stderr "usage: monitor_integration.tcl path-to-lib"
+if {$argc != 2} {
+    puts stderr "usage: monitor_integration.tcl path-to-lib path-to-randr-close-probe"
     exit 2
 }
 load [lindex $argv 0] Tclpanelx11
+set randr_close_probe [lindex $argv 1]
 source [file join [file dirname [info script]] .. src panel.tcl]
 
 proc assert {condition message} {
@@ -69,6 +70,32 @@ set selected [::tclpanel::panel::select_monitor $initial 0]
 assert {[dict get $selected name] eq [dict get $first name]} "monitor index selection failed"
 assert {[::tclpanel::panel::geometry_for_monitor $selected 36 bottom] eq "1280x36+0+988"} \
     "bottom panel geometry is incorrect"
+
+# Isolate which Xlib/RandR operation, if any, makes Xvfb discard a
+# client-defined logical monitor when its Display connection closes.
+foreach mode {open select get select-get} {
+    set probe_name "TclPanelCloseProbe_[string map {- _} $mode]"
+    if {[catch {
+        exec xrandr --setmonitor $probe_name 1280/340x1024/270+0+0 none
+    } err]} {
+        puts stderr "FAIL: could not create $probe_name: $err"
+        exit 1
+    }
+    if {[catch {exec $randr_close_probe $mode} err]} {
+        catch {exec xrandr --delmonitor $probe_name}
+        puts stderr "FAIL: RandR close probe '$mode' failed: $err"
+        exit 1
+    }
+    set probe_listing [exec xrandr --listmonitors]
+    if {[string first $probe_name $probe_listing] < 0} {
+        puts stderr "FAIL: logical monitor disappeared after RandR close probe '$mode': $probe_listing"
+        exit 1
+    }
+    if {[catch {exec xrandr --delmonitor $probe_name} err]} {
+        puts stderr "FAIL: could not remove $probe_name after probe: $err"
+        exit 1
+    }
+}
 
 set ::monitor_events 0
 ::x11::watch_monitors monitor_callback
