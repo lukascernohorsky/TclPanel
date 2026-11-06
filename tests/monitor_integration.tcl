@@ -81,6 +81,11 @@ foreach mode {open select get select-get} {
         puts stderr "FAIL: could not create $probe_name: $err"
         exit 1
     }
+    set before_probe_listing [exec xrandr --listmonitors]
+    if {[string first $probe_name $before_probe_listing] < 0} {
+        puts stderr "FAIL: synthetic monitor $probe_name was not present before probe: $before_probe_listing"
+        exit 1
+    }
     if {[catch {exec $randr_close_probe $mode} err]} {
         catch {exec xrandr --delmonitor $probe_name}
         puts stderr "FAIL: RandR close probe '$mode' failed: $err"
