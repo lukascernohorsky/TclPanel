@@ -34,6 +34,7 @@ int main(int argc, char **argv) {
     Window root;
     const char *mode;
     int watch_mode, select_mode, get_mode;
+    int event_base = 0, error_base = 0;
 
     if (argc < 2 || argc > 3) {
         fprintf(stderr, "usage: %s open|select|get|select-get|watch ?monitor-name?\n", argv[0]);
@@ -68,7 +69,6 @@ int main(int argc, char **argv) {
     root = DefaultRootWindow(dpy);
 
     if (select_mode) {
-        int event_base, error_base;
         if (!XRRQueryExtension(dpy, &event_base, &error_base)) {
             fprintf(stderr, "XRandR extension unavailable\n");
             XCloseDisplay(dpy);
