@@ -9,6 +9,7 @@ proc assert {condition message} {
     if {![uplevel 1 [list expr $condition]]} { error $message }
 }
 assert {[::tclpanel::config::get height] == 36} "unexpected default panel height"
+assert {[::tclpanel::config::get monitor] eq "primary"} "default monitor selection should prefer the primary monitor"
 assert {[llength [::tclpanel::config::get modules]] > 0} "no default modules configured"
 assert {[::tclpanel::config::get missing fallback] eq "fallback"} "config fallback failed"
 foreach module [glob -nocomplain [file join $root src modules *.tcl]] {
@@ -20,11 +21,94 @@ assert {[llength [info commands ::tclpanel::module::tray::create]] == 1} "tray m
 set fakeMonitors [list \
     [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 1] \
     [dict create name DP-1 x 1920 y 0 width 2560 height 1440 primary 0]]
+set selected [::tclpanel::panel::select_monitor $fakeMonitors primary]
+assert {[dict get $selected name] eq "HDMI-1"} "primary monitor selection failed"
 set selected [::tclpanel::panel::select_monitor $fakeMonitors 1]
 assert {[dict get $selected name] eq "DP-1"} "monitor index selection failed"
-set selected [::tclpanel::panel::select_monitor $fakeMonitors HDMI-1]
-assert {[dict get $selected name] eq "HDMI-1"} "monitor name selection failed"
-assert {[::tclpanel::panel::geometry_for_monitor $selected 40 bottom] eq "1920x40+0+1040"} "monitor geometry calculation failed"
+set selected [::tclpanel::panel::select_monitor $fakeMonitors DP-1]
+assert {[dict get $selected name] eq "DP-1"} "monitor name selection failed"
+set selected [::tclpanel::panel::select_monitor $fakeMonitors missing-output]
+assert {[dict get $selected name] eq "HDMI-1"} "missing monitor name should fall back to primary"
+set selected [::tclpanel::panel::select_monitor $fakeMonitors 99]
+assert {[dict get $selected name] eq "HDMI-1"} "out-of-range monitor index should fall back to primary"
+assert {[::tclpanel::panel::geometry_for_monitor $selected 40 bottom] eq "1920x40+0+1040"} "bottom monitor geometry calculation failed"
+assert {[::tclpanel::panel::geometry_for_monitor $selected 40 top] eq "1920x40+0+0"} "top monitor geometry calculation failed"
+set leftMonitor [dict create name DP-2 x -1600 y -200 width 1600 height 900 primary 0]
+assert {[::tclpanel::panel::geometry_for_monitor $leftMonitor 32 bottom] eq "1600x32-1600+668"} "negative-origin bottom monitor geometry failed"
+assert {[::tclpanel::panel::geometry_for_monitor $leftMonitor 32 top] eq "1600x32-1600-200"} "negative-origin top monitor geometry failed"
+
+# Exercise refresh_geometry itself, including the idle callback used by the
+# monitor watcher. Stub only the Tk/X11 boundary; monitor selection and panel
+# geometry remain production code.
+set ::panel_test_geometry {}
+proc wm {subcommand args} {
+    if {$subcommand eq "geometry"} {
+        set ::panel_test_geometry [lindex $args 1]
+        return
+    }
+    error "unexpected wm operation: $subcommand $args"
+}
+namespace eval ::x11 {}
+proc ::x11::monitors {} { return $::panel_test_monitors }
+set ::panel_test_window_exists 0
+proc winfo {subcommand widget} {
+    if {$subcommand eq "exists"} { return $::panel_test_window_exists }
+    if {$subcommand eq "id"} { return 12345 }
+    if {$subcommand eq "screenwidth"} { return 4480 }
+    if {$subcommand eq "screenheight"} { return 1440 }
+    error "unexpected winfo query: $subcommand"
+}
+set ::panel_test_strut {}
+proc ::x11::strut {args} { set ::panel_test_strut $args }
+set ::panel_test_monitors [list \
+    [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 0] \
+    [dict create name DP-1 x 1920 y 0 width 2560 height 1440 primary 1]]
+::tclpanel::panel::refresh_geometry
+assert {$::panel_test_geometry eq "2560x36+1920+1404"} \
+    "refresh_geometry did not apply the primary monitor geometry"
+assert {[dict get $::tclpanel::panel::monitor name] eq "DP-1"} \
+    "refresh_geometry did not retain the selected primary monitor"
+set ::panel_test_monitors [list \
+    [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 1]]
+::tclpanel::panel::monitor_changed
+update
+assert {$::panel_test_geometry eq "1920x36+0+1044"} \
+    "monitor_changed did not refresh panel geometry after primary monitor change"
+assert {[dict get $::tclpanel::panel::monitor name] eq "HDMI-1"} \
+    "monitor_changed did not update the selected monitor after topology change"
+set ::panel_test_monitors [list \
+    [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 1]]
+dict set ::tclpanel::config::values monitor DP-1
+::tclpanel::panel::refresh_geometry
+assert {$::panel_test_geometry eq "1920x36+0+1044"} \
+    "refresh_geometry did not fall back to primary when configured monitor disappeared"
+
+# Verify the EWMH reservation parameters, not just the panel window geometry.
+set ::panel_test_window_exists 1
+set ::tclpanel::panel::monitor [dict create name DP-1 x 1920 y 0 width 2560 height 1440 primary 1]
+dict set ::tclpanel::config::values position bottom
+::tclpanel::panel::apply_strut 36
+assert {$::panel_test_strut eq {12345 bottom 36 1920 4479}} \
+    "bottom strut did not reserve the selected monitor's horizontal range: $::panel_test_strut"
+dict set ::tclpanel::config::values position top
+set ::tclpanel::panel::monitor [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 1]
+::tclpanel::panel::apply_strut 36
+assert {$::panel_test_strut eq {12345 top 36 0 1919}} \
+    "top strut did not reserve the selected monitor's horizontal range: $::panel_test_strut"
+dict set ::tclpanel::config::values position bottom
+::tclpanel::panel::apply_strut 36
+assert {$::panel_test_strut eq {12345 bottom 0 0 4479}} \
+    "strut was not cleared when the monitor does not touch the root bottom edge: $::panel_test_strut"
+set ::tclpanel::panel::monitor [dict create name Left x -1600 y 0 width 1600 height 1440 primary 1]
+::tclpanel::panel::apply_strut 36
+assert {$::panel_test_strut eq {12345 bottom 0 0 4479}} \
+    "strut was not cleared for a monitor outside the root-screen horizontal range"
+set ::panel_test_window_exists 0
+dict set ::tclpanel::config::values monitor primary
+rename ::x11::monitors {}
+rename wm {}
+set fallback [::tclpanel::panel::select_monitor {} primary]
+assert {[dict get $fallback name] eq "screen" && [dict get $fallback width] == 4480 && [dict get $fallback height] == 1440} "empty monitor list fallback failed"
 assert {[llength [info commands ::tclpanel::xdg::discover]] == 1} "XDG discovery not loaded"
 assert {[file isfile [file join $root c x11.c]]} "X11 extension source missing"
 puts "TclPanel smoke tests passed"

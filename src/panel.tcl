@@ -59,7 +59,7 @@ proc ::tclpanel::panel::refresh_geometry {} {
     if {$edge ni {top bottom}} { set edge bottom }
     set list {}
     if {[llength [info commands ::x11::monitors]]} { catch {set list [::x11::monitors]} }
-    set monitor [select_monitor $list [::tclpanel::config::get monitor 0]]
+    set monitor [select_monitor $list [::tclpanel::config::get monitor primary]]
     wm geometry $bar [geometry_for_monitor $monitor $h $edge]
     apply_strut $h
 }

@@ -760,9 +760,92 @@ static int TrayCountCmd(ClientData cd, Tcl_Interp *ip, int objc,
 static Display *monitor_watch_display = NULL;
 static Tcl_Interp *monitor_watch_interp = NULL;
 static Tcl_Obj *monitor_watch_callback = NULL;
+static Tcl_Obj *monitor_watch_snapshot = NULL;
+static unsigned long monitor_watch_generation = 0;
+static Tcl_TimerToken monitor_watch_notify_timer = NULL;
+static Tcl_TimerToken monitor_watch_timer = NULL;
 static int monitor_watch_event_base = 0;
 
+static Tcl_Obj *monitor_watch_read_snapshot(Tcl_Interp *ip) {
+    XRRMonitorInfo *monitors;
+    int count = 0, i, j;
+    Tcl_Obj *snapshot = Tcl_NewListObj(0, NULL);
+    if (monitor_watch_display == NULL) return snapshot;
+    monitors = XRRGetMonitors(monitor_watch_display,
+                              DefaultRootWindow(monitor_watch_display),
+                              True, &count);
+    for (i = 0; monitors != NULL && i < count; i++) {
+        Tcl_Obj *entry = Tcl_NewListObj(0, NULL);
+        Tcl_Obj *outputs = Tcl_NewListObj(0, NULL);
+        char *name = XGetAtomName(monitor_watch_display, monitors[i].name);
+        Tcl_ListObjAppendElement(ip, entry,
+            Tcl_NewStringObj(name != NULL ? name : "monitor", -1));
+        if (name != NULL) XFree(name);
+        Tcl_ListObjAppendElement(ip, entry, Tcl_NewIntObj(monitors[i].x));
+        Tcl_ListObjAppendElement(ip, entry, Tcl_NewIntObj(monitors[i].y));
+        Tcl_ListObjAppendElement(ip, entry, Tcl_NewIntObj(monitors[i].width));
+        Tcl_ListObjAppendElement(ip, entry, Tcl_NewIntObj(monitors[i].height));
+        Tcl_ListObjAppendElement(ip, entry,
+            Tcl_NewBooleanObj(monitors[i].primary != False));
+        for (j = 0; j < monitors[i].noutput; j++)
+            Tcl_ListObjAppendElement(ip, outputs,
+                Tcl_NewWideIntObj((Tcl_WideInt)monitors[i].outputs[j]));
+        Tcl_ListObjAppendElement(ip, entry, outputs);
+        Tcl_ListObjAppendElement(ip, snapshot, entry);
+    }
+    if (monitors != NULL) XRRFreeMonitors(monitors);
+    return snapshot;
+}
+
+static void monitor_watch_notify(Tcl_Interp *ip) {
+    Tcl_Obj *callback;
+    if (monitor_watch_callback == NULL || monitor_watch_interp != ip) return;
+    callback = monitor_watch_callback;
+    Tcl_IncrRefCount(callback);
+    if (Tcl_EvalObjEx(ip, callback, TCL_EVAL_GLOBAL) != TCL_OK)
+        Tcl_BackgroundException(ip, TCL_ERROR);
+    Tcl_DecrRefCount(callback);
+}
+
+static int monitor_watch_refresh_snapshot(Tcl_Interp *ip) {
+    Tcl_Obj *current = monitor_watch_read_snapshot(ip);
+    int changed = monitor_watch_snapshot == NULL ||
+        strcmp(Tcl_GetString(current),
+               Tcl_GetString(monitor_watch_snapshot)) != 0;
+    if (monitor_watch_snapshot != NULL)
+        Tcl_DecrRefCount(monitor_watch_snapshot);
+    monitor_watch_snapshot = current;
+    Tcl_IncrRefCount(monitor_watch_snapshot);
+    return changed;
+}
+
+static void monitor_watch_timer_proc(ClientData cd);
+
+static void monitor_watch_notify_timer_proc(ClientData cd) {
+    Tcl_Interp *ip = (Tcl_Interp *)cd;
+    monitor_watch_notify_timer = NULL;
+    if (monitor_watch_display != NULL && monitor_watch_interp == ip)
+        monitor_watch_notify(ip);
+}
+
+static void monitor_watch_schedule_notify(Tcl_Interp *ip) {
+    if (monitor_watch_notify_timer == NULL &&
+        monitor_watch_display != NULL && monitor_watch_interp == ip)
+        monitor_watch_notify_timer = Tcl_CreateTimerHandler(
+            0, monitor_watch_notify_timer_proc, ip);
+}
+
 static void stop_monitor_watch(void) {
+    /* Invalidate a timer callback that may currently be executing Tcl code. */
+    monitor_watch_generation++;
+    if (monitor_watch_notify_timer != NULL) {
+        Tcl_DeleteTimerHandler(monitor_watch_notify_timer);
+        monitor_watch_notify_timer = NULL;
+    }
+    if (monitor_watch_timer != NULL) {
+        Tcl_DeleteTimerHandler(monitor_watch_timer);
+        monitor_watch_timer = NULL;
+    }
     if (monitor_watch_display != NULL) {
         Tcl_DeleteFileHandler(ConnectionNumber(monitor_watch_display));
         XCloseDisplay(monitor_watch_display);
@@ -772,12 +855,38 @@ static void stop_monitor_watch(void) {
         Tcl_DecrRefCount(monitor_watch_callback);
         monitor_watch_callback = NULL;
     }
+    if (monitor_watch_snapshot != NULL) {
+        Tcl_DecrRefCount(monitor_watch_snapshot);
+        monitor_watch_snapshot = NULL;
+    }
     monitor_watch_interp = NULL;
 }
+
 static void monitor_watch_deleted(ClientData cd, Tcl_Interp *ip) {
     (void)cd;
     if (monitor_watch_interp == ip) stop_monitor_watch();
 }
+
+static void monitor_watch_timer_proc(ClientData cd) {
+    Tcl_Interp *ip = (Tcl_Interp *)cd;
+    unsigned long generation = monitor_watch_generation;
+    monitor_watch_timer = NULL;
+    if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
+    {
+        int changed = monitor_watch_refresh_snapshot(ip);
+        if (changed) monitor_watch_schedule_notify(ip);
+    }
+    /*
+     * Notifications are dispatched on a separate Tcl timer, outside this
+     * polling callback. The generation check remains a guard against any
+     * future synchronous callback path that replaces the watcher.
+     */
+    if (monitor_watch_generation == generation &&
+        monitor_watch_display != NULL && monitor_watch_interp == ip)
+        monitor_watch_timer = Tcl_CreateTimerHandler(500,
+                                      monitor_watch_timer_proc, ip);
+}
+
 static void monitor_watch_readable(ClientData cd, int mask) {
     XEvent ev;
     int changed = 0;
@@ -793,14 +902,12 @@ static void monitor_watch_readable(ClientData cd, int mask) {
             changed = 1;
         }
     }
-    if (changed && monitor_watch_callback != NULL) {
-        Tcl_Obj *callback = monitor_watch_callback;
-        Tcl_IncrRefCount(callback);
-        if (Tcl_EvalObjEx(ip, callback, TCL_EVAL_GLOBAL) != TCL_OK)
-            Tcl_BackgroundException(ip, TCL_ERROR);
-        Tcl_DecrRefCount(callback);
+    if (changed) {
+        (void)monitor_watch_refresh_snapshot(ip);
+        monitor_watch_schedule_notify(ip);
     }
 }
+
 static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
                             Tcl_Obj *const objv[]) {
     int error_base;
@@ -812,14 +919,16 @@ static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     stop_monitor_watch();
     monitor_watch_display = XOpenDisplay(NULL);
     if (monitor_watch_display == NULL) {
-        Tcl_SetObjResult(ip, Tcl_NewStringObj("cannot open X display for monitor events", -1));
+        Tcl_SetObjResult(ip, Tcl_NewStringObj(
+            "cannot open X display for monitor events", -1));
         return TCL_ERROR;
     }
     if (!XRRQueryExtension(monitor_watch_display, &monitor_watch_event_base,
                            &error_base)) {
         XCloseDisplay(monitor_watch_display);
         monitor_watch_display = NULL;
-        Tcl_SetObjResult(ip, Tcl_NewStringObj("XRandR extension unavailable", -1));
+        Tcl_SetObjResult(ip, Tcl_NewStringObj(
+            "XRandR extension unavailable", -1));
         return TCL_ERROR;
     }
     XRRSelectInput(monitor_watch_display, DefaultRootWindow(monitor_watch_display),
@@ -830,11 +939,21 @@ static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     monitor_watch_interp = ip;
     monitor_watch_callback = objv[1];
     Tcl_IncrRefCount(monitor_watch_callback);
+    XSync(monitor_watch_display, False);
+    monitor_watch_snapshot = monitor_watch_read_snapshot(ip);
+    Tcl_IncrRefCount(monitor_watch_snapshot);
     Tcl_CreateFileHandler(ConnectionNumber(monitor_watch_display), TCL_READABLE,
                           monitor_watch_readable, ip);
+    /*
+     * RandR 1.5 has no event-selection bit for XRRSetMonitor/XRRDeleteMonitor.
+     * Poll the active logical-monitor topology so those changes are observable
+     * even when the server emits no screen/CRTC/output notification.
+     */
+    monitor_watch_timer = Tcl_CreateTimerHandler(500, monitor_watch_timer_proc, ip);
     Tcl_SetObjResult(ip, Tcl_NewBooleanObj(1));
     return TCL_OK;
 }
+
 static int UnwatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
                               Tcl_Obj *const objv[]) {
     (void)cd;
@@ -842,7 +961,6 @@ static int UnwatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     if (monitor_watch_interp == ip) stop_monitor_watch();
     return TCL_OK;
 }
-
 
 /* EWMH window-list watcher. Root properties track membership; per-client
  * events track title, state, desktop and mapping changes. */
@@ -1074,6 +1192,7 @@ static int MonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     dpy = open_display(ip);
     if (dpy == NULL) return TCL_ERROR;
     root = DefaultRootWindow(dpy);
+    XSync(dpy, False);
     monitors = XRRGetMonitors(dpy, root, True, &count);
     result = Tcl_NewListObj(0, NULL);
     if (monitors != NULL && count > 0) {
