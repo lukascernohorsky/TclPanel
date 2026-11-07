@@ -2,12 +2,11 @@
 # Xvfb has fixed pixel dimensions in CI; changing physical dimensions exercises
 # RandR screen notifications, while --setmonitor exercises logical topology
 # changes. Neither operation simulates a physical connector hotplug.
-if {$argc != 3} {
-    puts stderr "usage: monitor_integration.tcl path-to-lib path-to-randr-close-probe path-to-x11-hold-open"
+if {$argc != 2} {
+    puts stderr "usage: monitor_integration.tcl path-to-lib path-to-x11-hold-open"
     exit 2
 }
 load [lindex $argv 0] Tclpanelx11
-set randr_close_probe [lindex $argv 1]
 # Keep one unrelated X11 client connected for the entire test. X servers
 # configured with the default reset-on-last-client behavior discard all
 # server state when the final client disconnects; without this anchor, closing
@@ -18,7 +17,6 @@ if {[gets $hold_channel hold_status] < 0 || $hold_status ne "READY"} {
     puts stderr "FAIL: could not establish persistent X11 test client"
     exit 1
 }
-set ::env(TCLPANEL_RANDR_DEBUG) 1
 source [file join [file dirname [info script]] .. src panel.tcl]
 
 proc assert {condition message} {
@@ -36,7 +34,6 @@ proc monitor_restart_callback {} {
     # when the monitor introduced by this test is actually present.
     set before_query [::x11::monitors]
     set before_unwatch_xrandr [exec xrandr --listmonitors]
-    puts stderr "RESTARTDBG callback query=$before_query xrandr=$before_unwatch_xrandr"
     if {[monitor_named $before_query TclPanelRestartProbe] eq ""} {
         return
     }
@@ -46,9 +43,7 @@ proc monitor_restart_callback {} {
     ::x11::unwatch_monitors
     set after_unwatch_query [::x11::monitors]
     set after_unwatch_xrandr [exec xrandr --listmonitors]
-    puts stderr "RESTARTDBG after-unwatch monitors=$after_unwatch_query xrandr=$after_unwatch_xrandr"
     ::x11::watch_monitors monitor_callback
-    puts stderr "RESTARTDBG after-watch monitors=[::x11::monitors]"
     set ::monitor_done 1
 }
 proc wait_for_monitor_event {previous_count} {
@@ -157,79 +152,6 @@ if {[string first TclPanelUnwatchProbe $ordinary_unwatch_listing] < 0} {
 }
 exec xrandr --delmonitor TclPanelUnwatchProbe
 
-
-# Isolate which Xlib/RandR operation, if any, makes Xvfb discard a
-# client-defined logical monitor when its Display connection closes.
-foreach mode {open select get select-get} {
-    set probe_name "TclPanelCloseProbe_[string map {- _} $mode]"
-    if {[catch {
-        exec xrandr --setmonitor $probe_name 1280/340x1024/270+0+0 none
-    } err]} {
-        puts stderr "FAIL: could not create $probe_name: $err"
-        exit 1
-    }
-    set before_probe_listing [exec xrandr --listmonitors]
-    if {[string first $probe_name $before_probe_listing] < 0} {
-        puts stderr "FAIL: synthetic monitor $probe_name was not present before probe: $before_probe_listing"
-        exit 1
-    }
-    if {[catch {exec $randr_close_probe $mode} err]} {
-        catch {exec xrandr --delmonitor $probe_name}
-        puts stderr "FAIL: RandR close probe '$mode' failed: $err"
-        exit 1
-    }
-    set probe_listing [exec xrandr --listmonitors]
-    if {[string first $probe_name $probe_listing] < 0} {
-        puts stderr "FAIL: logical monitor disappeared after RandR close probe '$mode': $probe_listing"
-        exit 1
-    }
-    if {[catch {exec xrandr --delmonitor $probe_name} err]} {
-        puts stderr "FAIL: could not remove $probe_name after probe: $err"
-        exit 1
-    }
-}
-
-# Keep one RandR client connected while a second client creates a logical
-# monitor. Drain events and poll the topology before closing the first client.
-set live_probe TclPanelLiveProbe
-if {[catch {exec $randr_close_probe watch $live_probe} probe_error]} {
-    puts stderr "FAIL: live RandR connection probe failed: $probe_error"
-    exit 1
-}
-set live_listing [exec xrandr --listmonitors]
-if {[string first $live_probe $live_listing] < 0} {
-    puts stderr "FAIL: logical monitor vanished after live connection probe: $live_listing"
-    exit 1
-}
-exec xrandr --delmonitor $live_probe
-
-# Separate event dispatch from periodic topology queries. The combined probe
-# above exercises both; these variants identify which operation is necessary
-# to reproduce the Xvfb monitor cleanup on connection close.
-foreach mode {get-defined get-both watch-event watch-poll} {
-    set probe_name "TclPanel_[string map {- _} $mode]"
-    if {$mode eq "get-defined" || $mode eq "get-both"} {
-        if {[catch {
-            exec xrandr --setmonitor $probe_name 1280/340x1024/270+0+0 none
-        } err]} {
-            puts stderr "FAIL: could not create $probe_name: $err"
-            exit 1
-        }
-        set probe_command [list $randr_close_probe $mode]
-    } else {
-        set probe_command [list $randr_close_probe $mode $probe_name]
-    }
-    if {[catch {exec {*}$probe_command} err]} {
-        puts stderr "FAIL: RandR $mode probe failed: $err"
-        exit 1
-    }
-    set listing [exec xrandr --listmonitors]
-    if {[string first $probe_name $listing] < 0} {
-        puts stderr "FAIL: logical monitor disappeared after RandR $mode probe: $listing"
-        exit 1
-    }
-    exec xrandr --delmonitor $probe_name
-}
 
 # Exercise watcher replacement from inside a timer-driven callback.
 # Adding a logical monitor is detected by polling; the callback restarts the
