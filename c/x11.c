@@ -835,29 +835,6 @@ static void monitor_watch_schedule_notify(Tcl_Interp *ip) {
             0, monitor_watch_notify_timer_proc, ip);
 }
 
-static void monitor_watch_debug_state(const char *stage, Display *observer) {
-    int active, i;
-    if (observer == NULL) return;
-    for (active = 0; active <= 1; active++) {
-        XRRMonitorInfo *monitors;
-        int count = 0;
-        monitors = XRRGetMonitors(observer, DefaultRootWindow(observer),
-                                  active ? True : False, &count);
-        fprintf(stderr, "WATCHDBG state=%s active=%d count=%d",
-                stage, active, count);
-        for (i = 0; monitors != NULL && i < count; i++) {
-            char *name = XGetAtomName(observer, monitors[i].name);
-            fprintf(stderr, " {%s %d %d %d %d}", name != NULL ? name : "?",
-                    monitors[i].x, monitors[i].y,
-                    monitors[i].width, monitors[i].height);
-            if (name != NULL) XFree(name);
-        }
-        fprintf(stderr, "\\n");
-        if (monitors != NULL) XRRFreeMonitors(monitors);
-        XSync(observer, False);
-    }
-}
-
 static void stop_monitor_watch(void) {
     /* Invalidate a timer callback that may currently be executing Tcl code. */
     monitor_watch_generation++;
@@ -870,27 +847,9 @@ static void stop_monitor_watch(void) {
         monitor_watch_timer = NULL;
     }
     if (monitor_watch_display != NULL) {
-        Display *observer = getenv("TCLPANEL_RANDR_DEBUG") != NULL ?
-                            XOpenDisplay(NULL) : NULL;
-        fprintf(stderr, "WATCHDBG stop gen=%lu snapshot=%s\\n",
-                monitor_watch_generation,
-                monitor_watch_snapshot != NULL ?
-                Tcl_GetString(monitor_watch_snapshot) : "(null)");
-        monitor_watch_debug_state("before-stop", observer);
         Tcl_DeleteFileHandler(ConnectionNumber(monitor_watch_display));
-        monitor_watch_debug_state("after-file-handler-delete", observer);
-        XSync(monitor_watch_display, False);
-        monitor_watch_debug_state("after-watcher-sync", observer);
         XCloseDisplay(monitor_watch_display);
         monitor_watch_display = NULL;
-        monitor_watch_debug_state("after-watcher-close", observer);
-        if (observer != NULL) {
-            XCloseDisplay(observer);
-            observer = XOpenDisplay(NULL);
-            monitor_watch_debug_state("after-observer-close-new-connection",
-                                      observer);
-            if (observer != NULL) XCloseDisplay(observer);
-        }
     }
     if (monitor_watch_callback != NULL) {
         Tcl_DecrRefCount(monitor_watch_callback);
@@ -915,10 +874,6 @@ static void monitor_watch_timer_proc(ClientData cd) {
     if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
     {
         int changed = monitor_watch_refresh_snapshot(ip);
-        fprintf(stderr, "WATCHDBG poll gen=%lu changed=%d snapshot=%s\\n",
-                generation, changed,
-                monitor_watch_snapshot != NULL ?
-                Tcl_GetString(monitor_watch_snapshot) : "(null)");
         if (changed) monitor_watch_schedule_notify(ip);
     }
     /*
@@ -940,8 +895,6 @@ static void monitor_watch_readable(ClientData cd, int mask) {
     if (monitor_watch_display == NULL || monitor_watch_interp != ip) return;
     while (XPending(monitor_watch_display)) {
         XNextEvent(monitor_watch_display, &ev);
-        fprintf(stderr, "WATCHDBG event type=%d base=%d\\n",
-                ev.type, monitor_watch_event_base);
         if (ev.type == monitor_watch_event_base + RRScreenChangeNotify) {
             XRRUpdateConfiguration(&ev);
             changed = 1;
@@ -989,8 +942,6 @@ static int WatchMonitorsCmd(ClientData cd, Tcl_Interp *ip, int objc,
     XSync(monitor_watch_display, False);
     monitor_watch_snapshot = monitor_watch_read_snapshot(ip);
     Tcl_IncrRefCount(monitor_watch_snapshot);
-    fprintf(stderr, "WATCHDBG start gen=%lu snapshot=%s\\n",
-            monitor_watch_generation, Tcl_GetString(monitor_watch_snapshot));
     Tcl_CreateFileHandler(ConnectionNumber(monitor_watch_display), TCL_READABLE,
                           monitor_watch_readable, ip);
     /*
