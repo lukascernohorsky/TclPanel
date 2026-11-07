@@ -113,11 +113,10 @@ int main(int argc, char **argv) {
             }
             if (get_mode) read_monitors(dpy, root, True);
         }
-    } else if (get_mode) {
-        read_monitors(dpy, root, True);
-    } else if (defined_mode) {
-        read_monitors(dpy, root, False);
-        if (strcmp(mode, "get-both") == 0)
+    } else {
+        if (defined_mode)
+            read_monitors(dpy, root, False);
+        if (get_mode)
             read_monitors(dpy, root, True);
     }
 
