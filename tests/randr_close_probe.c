@@ -41,7 +41,9 @@ int main(int argc, char **argv) {
         return 2;
     }
     mode = argv[1];
-    watch_mode = strncmp(mode, "watch", 5) == 0;
+    watch_mode = strcmp(mode, "watch") == 0 ||
+                 strcmp(mode, "watch-event") == 0 ||
+                 strcmp(mode, "watch-poll") == 0;
     select_mode = strcmp(mode, "select") == 0 ||
                   strcmp(mode, "select-get") == 0 ||
                   strcmp(mode, "watch") == 0 ||
