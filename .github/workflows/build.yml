@@ -27,3 +27,5 @@ jobs:
         run: make test-workspace
       - name: Run XRandR monitor change integration test
         run: make test-monitors
+      - name: Run EWMH strut property integration test
+        run: make test-x11-strut
