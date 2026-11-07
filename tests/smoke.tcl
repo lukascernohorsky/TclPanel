@@ -50,12 +50,16 @@ proc wm {subcommand args} {
 }
 namespace eval ::x11 {}
 proc ::x11::monitors {} { return $::panel_test_monitors }
+set ::panel_test_window_exists 0
 proc winfo {subcommand widget} {
-    if {$subcommand eq "exists"} { return 0 }
-    if {$subcommand eq "screenwidth"} { return 2560 }
+    if {$subcommand eq "exists"} { return $::panel_test_window_exists }
+    if {$subcommand eq "id"} { return 12345 }
+    if {$subcommand eq "screenwidth"} { return 4480 }
     if {$subcommand eq "screenheight"} { return 1440 }
     error "unexpected winfo query: $subcommand"
 }
+set ::panel_test_strut {}
+proc ::x11::strut {args} { set ::panel_test_strut $args }
 set ::panel_test_monitors [list \
     [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 0] \
     [dict create name DP-1 x 1920 y 0 width 2560 height 1440 primary 1]]
@@ -78,6 +82,28 @@ dict set ::tclpanel::config::values monitor DP-1
 ::tclpanel::panel::refresh_geometry
 assert {$::panel_test_geometry eq "1920x36+0+1044"} \
     "refresh_geometry did not fall back to primary when configured monitor disappeared"
+
+# Verify the EWMH reservation parameters, not just the panel window geometry.
+set ::panel_test_window_exists 1
+set ::tclpanel::panel::monitor [dict create name DP-1 x 1920 y 0 width 2560 height 1440 primary 1]
+dict set ::tclpanel::config::values position bottom
+::tclpanel::panel::apply_strut 36
+assert {$::panel_test_strut eq {12345 bottom 36 1920 4479}} \
+    "bottom strut did not reserve the selected monitor's horizontal range: $::panel_test_strut"
+dict set ::tclpanel::config::values position top
+set ::tclpanel::panel::monitor [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 1]
+::tclpanel::panel::apply_strut 36
+assert {$::panel_test_strut eq {12345 top 36 0 1919}} \
+    "top strut did not reserve the selected monitor's horizontal range: $::panel_test_strut"
+dict set ::tclpanel::config::values position bottom
+::tclpanel::panel::apply_strut 36
+assert {$::panel_test_strut eq {12345 bottom 0 0 4479}} \
+    "strut was not cleared when the monitor does not touch the root bottom edge: $::panel_test_strut"
+set ::tclpanel::panel::monitor [dict create name Left x -1600 y 0 width 1600 height 1440 primary 1]
+::tclpanel::panel::apply_strut 36
+assert {$::panel_test_strut eq {12345 bottom 0 0 4479}} \
+    "strut was not cleared for a monitor outside the root-screen horizontal range"
+set ::panel_test_window_exists 0
 dict set ::tclpanel::config::values monitor primary
 rename ::x11::monitors {}
 rename wm {}
