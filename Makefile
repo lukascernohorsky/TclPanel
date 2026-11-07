@@ -8,7 +8,7 @@ CFLAGS ?= -O2 -Wall -Wextra
 BUILD_DIR = build
 EXT = $(BUILD_DIR)/libtclpanelx11.so
 TCL_PKGS ?= tcl tk x11 xrandr
-.PHONY: all clean run test test-tray test-window-watch test-desktop-watch test-taskbar test-workspace test-monitors test-x11-load install
+.PHONY: all clean run test test-tray test-window-watch test-desktop-watch test-taskbar test-workspace test-monitors test-x11-load test-x11-strut install
 all: $(EXT)
 $(BUILD_DIR):
 	mkdir -p $@
@@ -55,3 +55,8 @@ install: all
 	install -m 755 $(EXT) $(DESTDIR)$(PREFIX)/lib/tclpanel/
 clean:
 	rm -rf $(BUILD_DIR)
+
+$(BUILD_DIR)/strut-property-probe: tests/strut_property_probe.c $(BUILD_DIR)
+	$(CC) $(CFLAGS) -o $@ tests/strut_property_probe.c `$(PKG_CONFIG) --cflags --libs x11`
+test-x11-strut: all $(BUILD_DIR)/strut-property-probe
+	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a -s "-screen 0 1280x1024x24" $(TCLSH) tests/strut_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/strut-property-probe; else $(TCLSH) tests/strut_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/strut-property-probe; fi
