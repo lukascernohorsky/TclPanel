@@ -6,7 +6,7 @@ int main(void) {
     int ch;
 
     if (display == NULL) {
-        fprintf(stderr, "cannot open X display\\n");
+        fprintf(stderr, "cannot open X display\n");
         return 1;
     }
     puts("READY");
