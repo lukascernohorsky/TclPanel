@@ -41,10 +41,8 @@ test-workspace:
 	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a $(TCLSH) tests/workspace_integration.tcl; else $(TCLSH) tests/workspace_integration.tcl; fi
 $(BUILD_DIR)/x11-hold-open: tests/x11_hold_open.c $(BUILD_DIR)
 	$(CC) $(CFLAGS) -o $@ tests/x11_hold_open.c `$(PKG_CONFIG) --cflags --libs x11`
-$(BUILD_DIR)/randr-close-probe: tests/randr_close_probe.c $(BUILD_DIR)
-	$(CC) $(CFLAGS) -o $@ tests/randr_close_probe.c `$(PKG_CONFIG) --cflags --libs x11 xrandr`
-test-monitors: all $(BUILD_DIR)/randr-close-probe $(BUILD_DIR)/x11-hold-open
-	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a -s "-screen 0 1280x1024x24" $(TCLSH) tests/monitor_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/randr-close-probe $(CURDIR)/$(BUILD_DIR)/x11-hold-open; else $(TCLSH) tests/monitor_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/randr-close-probe $(CURDIR)/$(BUILD_DIR)/x11-hold-open; fi
+test-monitors: all $(BUILD_DIR)/x11-hold-open
+	@if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a -s "-screen 0 1280x1024x24" $(TCLSH) tests/monitor_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/x11-hold-open; else $(TCLSH) tests/monitor_integration.tcl $(CURDIR)/$(EXT) $(CURDIR)/$(BUILD_DIR)/x11-hold-open; fi
 install: all
 	install -d $(DESTDIR)$(PREFIX)/bin \
 		$(DESTDIR)$(PREFIX)/share/tclpanel/src/modules \
