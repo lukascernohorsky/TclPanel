@@ -21,9 +21,9 @@ static int set_monitor_while_connected(const char *name) {
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
-static void read_monitors(Display *dpy, Window root) {
+static void read_monitors(Display *dpy, Window root, Bool active) {
     int count = 0;
-    XRRMonitorInfo *monitors = XRRGetMonitors(dpy, root, True, &count);
+    XRRMonitorInfo *monitors = XRRGetMonitors(dpy, root, active, &count);
     if (monitors != NULL)
         XRRFreeMonitors(monitors);
     XSync(dpy, False);
@@ -33,11 +33,11 @@ int main(int argc, char **argv) {
     Display *dpy;
     Window root;
     const char *mode;
-    int watch_mode, select_mode, get_mode;
+    int watch_mode, select_mode, get_mode, defined_mode;
     int event_base = 0, error_base = 0;
 
     if (argc < 2 || argc > 3) {
-        fprintf(stderr, "usage: %s open|select|get|select-get|watch|watch-event|watch-poll ?monitor-name?\n", argv[0]);
+        fprintf(stderr, "usage: %s open|select|get|get-defined|get-both|select-get|watch|watch-event|watch-poll ?monitor-name?\n", argv[0]);
         return 2;
     }
     mode = argv[1];
@@ -49,9 +49,12 @@ int main(int argc, char **argv) {
                   strcmp(mode, "watch") == 0 ||
                   strcmp(mode, "watch-event") == 0;
     get_mode = strcmp(mode, "get") == 0 ||
+               strcmp(mode, "get-both") == 0 ||
                strcmp(mode, "select-get") == 0 ||
                strcmp(mode, "watch") == 0 ||
                strcmp(mode, "watch-poll") == 0;
+    defined_mode = strcmp(mode, "get-defined") == 0 ||
+                   strcmp(mode, "get-both") == 0;
     if (!watch_mode && argc != 2) {
         fprintf(stderr, "unexpected monitor name for mode %s\n", mode);
         return 2;
@@ -62,6 +65,8 @@ int main(int argc, char **argv) {
     }
     if (!watch_mode && strcmp(mode, "open") != 0 &&
         strcmp(mode, "select") != 0 && strcmp(mode, "get") != 0 &&
+        strcmp(mode, "get-defined") != 0 &&
+        strcmp(mode, "get-both") != 0 &&
         strcmp(mode, "select-get") != 0) {
         fprintf(stderr, "unknown probe mode: %s\n", mode);
         return 2;
@@ -106,10 +111,14 @@ int main(int argc, char **argv) {
                 if (event.type == event_base + RRScreenChangeNotify)
                     XRRUpdateConfiguration(&event);
             }
-            if (get_mode) read_monitors(dpy, root);
+            if (get_mode) read_monitors(dpy, root, True);
         }
     } else if (get_mode) {
-        read_monitors(dpy, root);
+        read_monitors(dpy, root, True);
+    } else if (defined_mode) {
+        read_monitors(dpy, root, False);
+        if (strcmp(mode, "get-both") == 0)
+            read_monitors(dpy, root, True);
     }
 
     XCloseDisplay(dpy);
