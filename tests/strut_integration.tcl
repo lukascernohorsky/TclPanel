@@ -23,4 +23,6 @@ exec $probe $window_id bottom 36 128 1023
 exec $probe $window_id bottom 0 0 1279
 
 destroy .strutprobe
+destroy .
 puts "EWMH strut integration tests passed"
+exit 0
