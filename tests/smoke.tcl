@@ -50,12 +50,6 @@ proc wm {subcommand args} {
 }
 namespace eval ::x11 {}
 proc ::x11::monitors {} { return $::panel_test_monitors }
-proc winfo {subcommand widget} {
-    if {$subcommand eq "exists"} { return 0 }
-    if {$subcommand eq "screenwidth"} { return 2560 }
-    if {$subcommand eq "screenheight"} { return 1440 }
-    error "unexpected winfo query: $subcommand"
-}
 set ::panel_test_monitors [list \
     [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 0] \
     [dict create name DP-1 x 1920 y 0 width 2560 height 1440 primary 1]]
