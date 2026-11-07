@@ -173,7 +173,12 @@ exec xrandr --delmonitor $live_probe
 # to reproduce the Xvfb monitor cleanup on connection close.
 foreach mode {get-defined get-both watch-event watch-poll} {
     set probe_name "TclPanel_[string map {- _} $mode]"
-    if {[catch {exec $randr_close_probe $mode $probe_name} err]} {
+    if {$mode eq "get-defined" || $mode eq "get-both"} {
+        set probe_command [list $randr_close_probe $mode]
+    } else {
+        set probe_command [list $randr_close_probe $mode $probe_name]
+    }
+    if {[catch {exec {*}$probe_command} err]} {
         puts stderr "FAIL: RandR $mode probe failed: $err"
         exit 1
     }
