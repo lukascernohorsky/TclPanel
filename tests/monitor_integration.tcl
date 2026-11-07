@@ -171,7 +171,7 @@ exec xrandr --delmonitor $live_probe
 # Separate event dispatch from periodic topology queries. The combined probe
 # above exercises both; these variants identify which operation is necessary
 # to reproduce the Xvfb monitor cleanup on connection close.
-foreach mode {watch-event watch-poll} {
+foreach mode {get-defined get-both watch-event watch-poll} {
     set probe_name "TclPanel_[string map {- _} $mode]"
     if {[catch {exec $randr_close_probe $mode $probe_name} err]} {
         puts stderr "FAIL: RandR $mode probe failed: $err"
