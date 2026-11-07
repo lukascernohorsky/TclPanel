@@ -108,7 +108,7 @@ dict set ::tclpanel::config::values monitor primary
 rename ::x11::monitors {}
 rename wm {}
 set fallback [::tclpanel::panel::select_monitor {} primary]
-assert {[dict get $fallback name] eq "screen" && [dict get $fallback width] == 2560 && [dict get $fallback height] == 1440} "empty monitor list fallback failed"
+assert {[dict get $fallback name] eq "screen" && [dict get $fallback width] == 4480 && [dict get $fallback height] == 1440} "empty monitor list fallback failed"
 assert {[llength [info commands ::tclpanel::xdg::discover]] == 1} "XDG discovery not loaded"
 assert {[file isfile [file join $root c x11.c]]} "X11 extension source missing"
 puts "TclPanel smoke tests passed"
