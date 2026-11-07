@@ -48,6 +48,7 @@ proc wm {subcommand args} {
     }
     error "unexpected wm operation: $subcommand $args"
 }
+namespace eval ::x11 {}
 proc ::x11::monitors {} { return $::panel_test_monitors }
 proc winfo {subcommand widget} {
     if {$subcommand eq "exists"} { return 0 }
@@ -81,6 +82,7 @@ dict set ::tclpanel::config::values monitor primary
 rename ::x11::monitors {}
 rename wm {}
 proc winfo {subcommand widget} {
+    if {$subcommand eq "exists"} { return 0 }
     if {$subcommand eq "screenwidth"} { return 2560 }
     if {$subcommand eq "screenheight"} { return 1440 }
     error "unexpected winfo query: $subcommand"
