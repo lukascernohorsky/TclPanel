@@ -123,6 +123,31 @@ set without_logical [::x11::monitors]
 assert {[monitor_named $without_logical TclPanelTestRight] eq ""} \
     "removed logical monitor is still reported: $without_logical"
 
+# Distinguish ordinary watcher shutdown after processing a monitor
+# change from shutdown initiated reentrantly by the callback.
+set ::monitor_events 0
+::x11::watch_monitors monitor_callback
+set before_unwatch_probe $::monitor_events
+if {[catch {
+    exec xrandr --setmonitor TclPanelUnwatchProbe 1280/340x1024/270+0+0 none
+} err]} {
+    ::x11::unwatch_monitors
+    puts stderr "FAIL: could not add ordinary-unwatch probe: $err"
+    exit 1
+}
+assert {[wait_for_monitor_event $before_unwatch_probe]} \
+    "monitor callback did not run for ordinary-unwatch probe"
+after 700 {set ::ordinary_unwatch_settled 1}
+vwait ::ordinary_unwatch_settled
+::x11::unwatch_monitors
+set ordinary_unwatch_listing [exec xrandr --listmonitors]
+if {[string first TclPanelUnwatchProbe $ordinary_unwatch_listing] < 0} {
+    puts stderr "FAIL: logical monitor disappeared after ordinary watcher shutdown: $ordinary_unwatch_listing"
+    exit 1
+}
+exec xrandr --delmonitor TclPanelUnwatchProbe
+
+
 # Isolate which Xlib/RandR operation, if any, makes Xvfb discard a
 # client-defined logical monitor when its Display connection closes.
 foreach mode {open select get select-get} {
@@ -195,30 +220,6 @@ foreach mode {get-defined get-both watch-event watch-poll} {
     }
     exec xrandr --delmonitor $probe_name
 }
-
-# Distinguish ordinary watcher shutdown after processing a monitor
-# change from shutdown initiated reentrantly by the callback.
-set ::monitor_events 0
-::x11::watch_monitors monitor_callback
-set before_unwatch_probe $::monitor_events
-if {[catch {
-    exec xrandr --setmonitor TclPanelUnwatchProbe 1280/340x1024/270+0+0 none
-} err]} {
-    ::x11::unwatch_monitors
-    puts stderr "FAIL: could not add ordinary-unwatch probe: $err"
-    exit 1
-}
-assert {[wait_for_monitor_event $before_unwatch_probe]} \
-    "monitor callback did not run for ordinary-unwatch probe"
-after 700 {set ::ordinary_unwatch_settled 1}
-vwait ::ordinary_unwatch_settled
-::x11::unwatch_monitors
-set ordinary_unwatch_listing [exec xrandr --listmonitors]
-if {[string first TclPanelUnwatchProbe $ordinary_unwatch_listing] < 0} {
-    puts stderr "FAIL: logical monitor disappeared after ordinary watcher shutdown: $ordinary_unwatch_listing"
-    exit 1
-}
-exec xrandr --delmonitor TclPanelUnwatchProbe
 
 # Exercise watcher replacement from inside a timer-driven callback.
 # Adding a logical monitor is detected by polling; the callback restarts the
