@@ -2,12 +2,22 @@
 # Xvfb has fixed pixel dimensions in CI; changing physical dimensions exercises
 # RandR screen notifications, while --setmonitor exercises logical topology
 # changes. Neither operation simulates a physical connector hotplug.
-if {$argc != 2} {
-    puts stderr "usage: monitor_integration.tcl path-to-lib path-to-randr-close-probe"
+if {$argc != 3} {
+    puts stderr "usage: monitor_integration.tcl path-to-lib path-to-randr-close-probe path-to-x11-hold-open"
     exit 2
 }
 load [lindex $argv 0] Tclpanelx11
 set randr_close_probe [lindex $argv 1]
+# Keep one unrelated X11 client connected for the entire test. X servers
+# configured with the default reset-on-last-client behavior discard all
+# server state when the final client disconnects; without this anchor, closing
+# the watcher can make the synthetic RandR monitor disappear on server reset.
+set hold_channel [open "|[lindex $argv 2]" r+]
+fconfigure $hold_channel -buffering line -translation lf
+if {[gets $hold_channel hold_status] < 0 || $hold_status ne "READY"} {
+    puts stderr "FAIL: could not establish persistent X11 test client"
+    exit 1
+}
 set ::env(TCLPANEL_RANDR_DEBUG) 1
 source [file join [file dirname [info script]] .. src panel.tcl]
 
@@ -265,4 +275,5 @@ after 300 {set ::settle 1}
 vwait ::settle
 assert {$::monitor_events == $events_after_unwatch} "callback fired after unwatch_monitors"
 
+close $hold_channel
 puts "PASS: XRandR screen notifications, logical monitor add/remove, fresh geometry and watcher cleanup"
