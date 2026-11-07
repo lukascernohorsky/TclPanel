@@ -11,7 +11,7 @@ load [lindex $argv 0] Tclpanelx11
 # configured with the default reset-on-last-client behavior discard all
 # server state when the final client disconnects; without this anchor, closing
 # the watcher can make the synthetic RandR monitor disappear on server reset.
-set hold_channel [open "|[lindex $argv 1]" r+]
+set hold_channel [open "|[lindex $argv 1]" r]
 fconfigure $hold_channel -buffering line -translation lf
 if {[gets $hold_channel hold_status] < 0 || $hold_status ne "READY"} {
     puts stderr "FAIL: could not establish persistent X11 test client"
