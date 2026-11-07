@@ -37,15 +37,19 @@ int main(int argc, char **argv) {
     int event_base = 0, error_base = 0;
 
     if (argc < 2 || argc > 3) {
-        fprintf(stderr, "usage: %s open|select|get|select-get|watch ?monitor-name?\n", argv[0]);
+        fprintf(stderr, "usage: %s open|select|get|select-get|watch|watch-event|watch-poll ?monitor-name?\n", argv[0]);
         return 2;
     }
     mode = argv[1];
-    watch_mode = strcmp(mode, "watch") == 0;
+    watch_mode = strncmp(mode, "watch", 5) == 0;
     select_mode = strcmp(mode, "select") == 0 ||
-                  strcmp(mode, "select-get") == 0 || watch_mode;
+                  strcmp(mode, "select-get") == 0 ||
+                  strcmp(mode, "watch") == 0 ||
+                  strcmp(mode, "watch-event") == 0;
     get_mode = strcmp(mode, "get") == 0 ||
-               strcmp(mode, "select-get") == 0;
+               strcmp(mode, "select-get") == 0 ||
+               strcmp(mode, "watch") == 0 ||
+               strcmp(mode, "watch-poll") == 0;
     if (!watch_mode && argc != 2) {
         fprintf(stderr, "unexpected monitor name for mode %s\n", mode);
         return 2;
@@ -100,7 +104,7 @@ int main(int argc, char **argv) {
                 if (event.type == event_base + RRScreenChangeNotify)
                     XRRUpdateConfiguration(&event);
             }
-            read_monitors(dpy, root);
+            if (get_mode) read_monitors(dpy, root);
         }
     } else if (get_mode) {
         read_monitors(dpy, root);
