@@ -168,6 +168,23 @@ if {[string first $live_probe $live_listing] < 0} {
 }
 exec xrandr --delmonitor $live_probe
 
+# Separate event dispatch from periodic topology queries. The combined probe
+# above exercises both; these variants identify which operation is necessary
+# to reproduce the Xvfb monitor cleanup on connection close.
+foreach mode {watch-event watch-poll} {
+    set probe_name "TclPanel_[string map {- _} $mode]"
+    if {[catch {exec $randr_close_probe $mode $probe_name} err]} {
+        puts stderr "FAIL: RandR $mode probe failed: $err"
+        exit 1
+    }
+    set listing [exec xrandr --listmonitors]
+    if {[string first $probe_name $listing] < 0} {
+        puts stderr "FAIL: logical monitor disappeared after RandR $mode probe: $listing"
+        exit 1
+    }
+    exec xrandr --delmonitor $probe_name
+}
+
 # Distinguish ordinary watcher shutdown after processing a monitor
 # change from shutdown initiated reentrantly by the callback.
 set ::monitor_events 0
