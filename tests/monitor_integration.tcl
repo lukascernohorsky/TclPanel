@@ -11,7 +11,7 @@ load [lindex $argv 0] Tclpanelx11
 # configured with the default reset-on-last-client behavior discard all
 # server state when the final client disconnects; without this anchor, closing
 # the watcher can make the synthetic RandR monitor disappear on server reset.
-set hold_channel [open "|[lindex $argv 2]" r+]
+set hold_channel [open "|[lindex $argv 1]" r+]
 fconfigure $hold_channel -buffering line -translation lf
 if {[gets $hold_channel hold_status] < 0 || $hold_status ne "READY"} {
     puts stderr "FAIL: could not establish persistent X11 test client"
@@ -33,7 +33,6 @@ proc monitor_restart_callback {} {
     # Ignore delayed notifications from earlier monitor changes. Restart only
     # when the monitor introduced by this test is actually present.
     set before_query [::x11::monitors]
-    set before_unwatch_xrandr [exec xrandr --listmonitors]
     if {[monitor_named $before_query TclPanelRestartProbe] eq ""} {
         return
     }
@@ -41,8 +40,6 @@ proc monitor_restart_callback {} {
     # Restart from inside the timer-driven callback. The expired timer must
     # not overwrite the timer installed by this new watcher.
     ::x11::unwatch_monitors
-    set after_unwatch_query [::x11::monitors]
-    set after_unwatch_xrandr [exec xrandr --listmonitors]
     ::x11::watch_monitors monitor_callback
     set ::monitor_done 1
 }
