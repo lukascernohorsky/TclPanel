@@ -16,7 +16,7 @@ Install with \`make install PREFIX=/usr/local\`, then start with \`tclpanel\`. \
 
 ## Current implementation
 
-- Tcl/Tk panel shell, user Tcl configuration (including monitor index/name selection) and loadable module structure.
+- Tcl/Tk panel shell, user Tcl configuration (primary monitor by default, with explicit monitor index/name selection) and loadable module structure.
 - Xlib extension with EWMH client-window enumeration, active-window lookup/notifications (`::x11::active_window`, `::x11::watch_windows`), desktop count/current desktop/names/switching (`::x11::desktop_names`, `::x11::watch_desktops`), dock/strut properties, XRandR monitor enumeration (`::x11::monitors`), and event-driven monitor-change notifications (`::x11::watch_monitors`).
 - Taskbar and workspace switcher use the Xlib extension when loaded; taskbar/workspace retain limited \`wmctrl\` fallback.
 - XDG application discovery from standard data directories, parsing of Application desktop entries, visibility filtering, shell-free Exec argument expansion, themed icon lookup, and category-grouped launcher menus.
@@ -30,7 +30,7 @@ Install with \`make install PREFIX=/usr/local\`, then start with \`tclpanel\`. \
 
 The XDG implementation is a practical Desktop Entry subset, not the complete freedesktop menu specification. It does not merge \`.menu\` files, resolve all localized keys, handle MIME actions or launch targets, or provide terminal emulation for \`Terminal=true\` entries. File/URL launch targets are not yet supported.
 
-The Xlib layer targets EWMH-compatible window managers. Multi-monitor hotplug integration coverage, complete XDG menu-specification support, and platform-specific system monitoring and power management remain future work. The system tray currently implements horizontal XEmbed layout; vertical panel integration and full XEmbed focus navigation are not yet implemented. Linux CI exercises the tray protocol under Xvfb. FreeBSD 15.0 CI currently validates compilation, Tcl loading, and display-independent tests; live desktop-session compatibility is not yet claimed.
+The Xlib layer targets EWMH-compatible window managers. Multi-monitor hotplug testing against physical display hardware, complete XDG menu-specification support, and platform-specific system monitoring and power management remain future work. The system tray currently implements horizontal XEmbed layout; vertical panel integration and full XEmbed focus navigation are not yet implemented. Linux CI exercises the tray protocol under Xvfb. FreeBSD 15.0 CI currently validates compilation, Tcl loading, and display-independent tests; live desktop-session compatibility is not yet claimed.
 
 
 ### System tray
