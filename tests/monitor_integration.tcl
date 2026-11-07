@@ -174,6 +174,12 @@ exec xrandr --delmonitor $live_probe
 foreach mode {get-defined get-both watch-event watch-poll} {
     set probe_name "TclPanel_[string map {- _} $mode]"
     if {$mode eq "get-defined" || $mode eq "get-both"} {
+        if {[catch {
+            exec xrandr --setmonitor $probe_name 1280/340x1024/270+0+0 none
+        } err]} {
+            puts stderr "FAIL: could not create $probe_name: $err"
+            exit 1
+        }
         set probe_command [list $randr_close_probe $mode]
     } else {
         set probe_command [list $randr_close_probe $mode $probe_name]
