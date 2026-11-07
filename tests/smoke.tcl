@@ -36,6 +36,50 @@ assert {[::tclpanel::panel::geometry_for_monitor $selected 40 top] eq "1920x40+0
 set leftMonitor [dict create name DP-2 x -1600 y -200 width 1600 height 900 primary 0]
 assert {[::tclpanel::panel::geometry_for_monitor $leftMonitor 32 bottom] eq "1600x32-1600+668"} "negative-origin bottom monitor geometry failed"
 assert {[::tclpanel::panel::geometry_for_monitor $leftMonitor 32 top] eq "1600x32-1600-200"} "negative-origin top monitor geometry failed"
+
+# Exercise refresh_geometry itself, including the idle callback used by the
+# monitor watcher. Stub only the Tk/X11 boundary; monitor selection and panel
+# geometry remain production code.
+set ::panel_test_geometry {}
+proc wm {subcommand args} {
+    if {$subcommand eq "geometry"} {
+        set ::panel_test_geometry [lindex $args 1]
+        return
+    }
+    error "unexpected wm operation: $subcommand $args"
+}
+proc ::x11::monitors {} { return $::panel_test_monitors }
+proc winfo {subcommand widget} {
+    if {$subcommand eq "exists"} { return 0 }
+    if {$subcommand eq "screenwidth"} { return 2560 }
+    if {$subcommand eq "screenheight"} { return 1440 }
+    error "unexpected winfo query: $subcommand"
+}
+set ::panel_test_monitors [list \
+    [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 0] \
+    [dict create name DP-1 x 1920 y 0 width 2560 height 1440 primary 1]]
+::tclpanel::panel::refresh_geometry
+assert {$::panel_test_geometry eq "2560x36+1920+1404"} \
+    "refresh_geometry did not apply the primary monitor geometry"
+assert {[dict get $::tclpanel::panel::monitor name] eq "DP-1"} \
+    "refresh_geometry did not retain the selected primary monitor"
+set ::panel_test_monitors [list \
+    [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 1]]
+::tclpanel::panel::monitor_changed
+update
+assert {$::panel_test_geometry eq "1920x36+0+1044"} \
+    "monitor_changed did not refresh panel geometry after primary monitor change"
+assert {[dict get $::tclpanel::panel::monitor name] eq "HDMI-1"} \
+    "monitor_changed did not update the selected monitor after topology change"
+set ::panel_test_monitors [list \
+    [dict create name HDMI-1 x 0 y 0 width 1920 height 1080 primary 1]]
+dict set ::tclpanel::config::values monitor DP-1
+::tclpanel::panel::refresh_geometry
+assert {$::panel_test_geometry eq "1920x36+0+1044"} \
+    "refresh_geometry did not fall back to primary when configured monitor disappeared"
+dict set ::tclpanel::config::values monitor primary
+rename ::x11::monitors {}
+rename wm {}
 proc winfo {subcommand widget} {
     if {$subcommand eq "screenwidth"} { return 2560 }
     if {$subcommand eq "screenheight"} { return 1440 }
